@@ -1,17 +1,32 @@
-// File: client/src/pages/Login.jsx
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import AuthContext from '../context/AuthContext';
 
 const Login = () => {
-    const { login } = useContext(AuthContext);
+    const { login, user, loading } = useContext(AuthContext);
+    const navigate = useNavigate(); // Hook for navigation
+
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
 
+    // 1. AUTO-REDIRECT: If user is already logged in, send them to their page
+    useEffect(() => {
+        if (!loading && user) {
+            if (user.role === 'admin') {
+                navigate('/admin', { replace: true });
+            } else {
+                navigate('/dashboard', { replace: true });
+            }
+        }
+    }, [user, loading, navigate]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Call the login function from AuthContext
         login(phone, password);
     };
+
+    // 2. Prevent flickering: Don't show form while checking auth status
+    if (loading) return null; 
 
     return (
         <div className="flex items-center justify-center h-screen bg-gray-100">

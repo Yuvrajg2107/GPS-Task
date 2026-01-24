@@ -44,15 +44,13 @@ exports.createTask = async (req, res) => {
         console.log("✅ Task Created with ID:", taskId);
 
         // Step 2: Assign to Users (Bulk Insert with Start Date)
-        // We include 'formattedStartDate' in the values
         const assignmentValues = assignedUserIds.map(userId => [
             taskId, 
             userId, 
             'viewed', 
-            formattedStartDate // <--- HERE IS THE FIX
+            formattedStartDate 
         ]);
 
-        // Updated Query to include 'assigned_at' column
         await connection.query(
             'INSERT INTO TaskAssignments (task_id, user_id, status, assigned_at) VALUES ?',
             [assignmentValues]
@@ -81,18 +79,17 @@ exports.createTask = async (req, res) => {
     }
 };
 
-// 2. GET TASKS
-// 2. GET TASKS (Updated for Monitoring)
+// 2. GET TASKS (Updated to SELECT assigned_at)
 exports.getTasks = async (req, res) => {
     try {
         const userId = req.user.id;
         const userRole = req.user.role;
         const { status } = req.query;
 
-        // We join 'Users' TWICE: once for the Creator (u1), once for the Assignee (u2)
+        // FIX IS HERE: Added 'ta.assigned_at' to the SELECT list
         let query = `
             SELECT t.id, t.heading, t.description, t.end_date, 
-                   ta.status, ta.user_id as assigned_to_id, 
+                   ta.status, ta.assigned_at, ta.user_id as assigned_to_id, 
                    u1.name as assigned_by_name, 
                    u2.name as assigned_to_name, u2.department as assigned_to_dept
             FROM Tasks t
@@ -187,11 +184,9 @@ exports.getTaskAttachments = async (req, res) => {
     }
 };
 
-// 5. GET ADMIN DASHBOARD STATS (Total Users, Active Tasks, Overdue)
+// 5. GET ADMIN DASHBOARD STATS
 exports.getAdminStats = async (req, res) => {
     try {
-        const now = new Date();
-
         // 1. Count Total Users (excluding admins)
         const [userRows] = await db.query("SELECT COUNT(*) as count FROM Users WHERE role != 'admin'");
         
@@ -199,7 +194,6 @@ exports.getAdminStats = async (req, res) => {
         const [activeRows] = await db.query("SELECT COUNT(*) as count FROM TaskAssignments WHERE status != 'completed'");
 
         // 3. Count Overdue Tasks (End date passed AND not completed)
-        // We join Tasks table to check end_date
         const [overdueRows] = await db.query(`
             SELECT COUNT(*) as count 
             FROM TaskAssignments ta 

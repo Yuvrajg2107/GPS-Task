@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                // Check if token is expired (exp is in seconds)
+                // Check if token is expired
                 if (decoded.exp * 1000 < Date.now()) {
                     logout();
                 } else {
@@ -35,9 +35,10 @@ export const AuthProvider = ({ children }) => {
             const decoded = jwtDecode(data.token);
             setUser(decoded);
             
-            // Redirect based on role
-            if (decoded.role === 'admin') navigate('/admin');
-            else navigate('/dashboard');
+            // Redirect based on role immediately after login
+            if (decoded.role === 'admin') navigate('/admin', { replace: true });
+            else navigate('/dashboard', { replace: true });
+            
         } catch (err) {
             console.error(err);
             alert(err.response?.data?.error || 'Login Failed');
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
-        navigate('/');
+        navigate('/', { replace: true }); // Go back to Login
     };
 
     return (
