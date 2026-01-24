@@ -1,6 +1,8 @@
-const mysql = require('mysql2');
+// server/db.js
+const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
+// Load the .env file variables
 dotenv.config();
 
 const pool = mysql.createPool({
@@ -8,14 +10,25 @@ const pool = mysql.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 4000,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    // IMPORTANT: Cloud databases require SSL (Secure Layer)
+    ssl: {
+        minVersion: 'TLSv1.2',
+        rejectUnauthorized: true
+    }
 });
 
-// Convert pool to promise-based (easier to use with async/await)
-const promisePool = pool.promise();
+// Test the connection when the app starts
+pool.getConnection()
+    .then(connection => {
+        console.log("✅ Successfully connected to TiDB Cloud Database!");
+        connection.release();
+    })
+    .catch(err => {
+        console.error("❌ Database Connection Failed:", err.message);
+    });
 
-console.log("MySQL Pool Created...");
-
-module.exports = promisePool;
+module.exports = pool;

@@ -69,9 +69,6 @@ const Login = () => {
                     </button>
                 </form>
 
-                <div className="text-center text-sm text-gray-500">
-                    <p>Demo Admin: 9999999999 / 12345</p>
-                </div>
             </div>
         </div>
     );
