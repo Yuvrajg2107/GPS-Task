@@ -234,3 +234,25 @@ exports.updateTaskDetails = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// ... (keep all existing code)
+
+// 9. DELETE ASSIGNMENT (Remove task for ONE specific user)
+exports.deleteTaskAssignment = async (req, res) => {
+    try {
+        const { taskId, userId } = req.params;
+        
+        // Only delete the row in TaskAssignments
+        await db.query(
+            'DELETE FROM TaskAssignments WHERE task_id = ? AND user_id = ?', 
+            [taskId, userId]
+        );
+
+        // Optional: Check if any assignments remain. If 0, maybe delete the Task parent?
+        // For now, we just remove the link.
+        
+        res.json({ message: "Task removed for this user" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
-import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye, Trash2, Edit, X, Save, Paperclip, FileText, Download } from 'lucide-react';
+import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye, Trash2, Edit, X, Save, Paperclip, FileText, Download, Users } from 'lucide-react';
 
 const TaskMonitoring = () => {
     const [tasks, setTasks] = useState([]);
@@ -9,27 +9,27 @@ const TaskMonitoring = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
 
-    // Modal State
+    // Edit Modal State
     const [selectedTask, setSelectedTask] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [attachments, setAttachments] = useState([]);
-    
-    // Edit Form State
     const [editFormData, setEditFormData] = useState({ heading: '', description: '', end_date: '' });
+
+    // Delete Choice Modal State
+    const [deleteModal, setDeleteModal] = useState(null); // Stores { taskId, userId, userName, taskTitle }
 
     useEffect(() => {
         fetchTasks();
     }, []);
 
-    // Fetch Attachments when a task is selected
+    // Fetch Attachments & Setup Edit Form when task is selected
     useEffect(() => {
         if (selectedTask) {
-            setAttachments([]); // Reset
+            setAttachments([]); 
             API.get(`/tasks/${selectedTask.id}/attachments`)
                 .then(res => setAttachments(res.data))
                 .catch(err => console.error(err));
             
-            // Populate Edit Form
             setEditFormData({
                 heading: selectedTask.heading,
                 description: selectedTask.description,
@@ -49,13 +49,39 @@ const TaskMonitoring = () => {
         }
     };
 
-    const handleDelete = async (id, e) => {
+    // --- DELETE LOGIC ---
+    
+    // 1. Open the choice modal
+    const openDeletePrompt = (task, e) => {
         e.stopPropagation();
-        if (!window.confirm("Are you sure? This will delete the task for ALL assigned users.")) return;
+        setDeleteModal({
+            taskId: task.id,
+            userId: task.assigned_to_id,
+            userName: task.assigned_to_name,
+            taskTitle: task.heading
+        });
+    };
+
+    // 2. Delete for SINGLE User
+    const handleDeleteSingle = async () => {
         try {
-            await API.delete(`/tasks/${id}`);
-            alert("Task Deleted!");
-            fetchTasks(); // Refresh list
+            await API.delete(`/tasks/${deleteModal.taskId}/assignment/${deleteModal.userId}`);
+            alert(`Task removed for ${deleteModal.userName}`);
+            setDeleteModal(null);
+            fetchTasks();
+        } catch (err) {
+            alert("Failed to remove assignment");
+        }
+    };
+
+    // 3. Delete for EVERYONE
+    const handleDeleteAll = async () => {
+        if (!window.confirm("WARNING: This will delete the task for ALL users permanently. Are you sure?")) return;
+        try {
+            await API.delete(`/tasks/${deleteModal.taskId}`);
+            alert("Task deleted for everyone");
+            setDeleteModal(null);
+            fetchTasks();
         } catch (err) {
             alert("Failed to delete task");
         }
@@ -68,14 +94,14 @@ const TaskMonitoring = () => {
             alert("Task Updated Successfully!");
             setIsEditing(false);
             setSelectedTask(null);
-            fetchTasks(); // Refresh list
+            fetchTasks(); 
         } catch (err) {
             alert("Failed to update task");
         }
     };
 
     const sendReminder = async (userId, taskHeading, e) => {
-        e.stopPropagation(); // Prevent opening modal
+        e.stopPropagation();
         try {
             await API.post('/tasks/remind', { user_id: userId, task_heading: taskHeading });
             alert("Reminder Notification Sent!");
@@ -137,6 +163,7 @@ const TaskMonitoring = () => {
                     </div>
                 </div>
 
+                {/* Filter Tabs */}
                 <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
                     {[
                         { id: 'all', label: 'All', icon: <Filter size={16}/>, color: 'blue' },
@@ -156,6 +183,7 @@ const TaskMonitoring = () => {
                     ))}
                 </div>
 
+                {/* Task Table */}
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                     {loading ? <div className="p-10 text-center text-gray-500">Loading tasks...</div> : filteredTasks.length === 0 ? <div className="p-10 text-center text-gray-500">No tasks found matching your filters.</div> : (
                         <div className="overflow-x-auto">
@@ -185,7 +213,7 @@ const TaskMonitoring = () => {
                                                 <td className="p-4">{getStatusBadge(task.status, computedStatus)}</td>
                                                 <td className="p-4 text-right flex justify-end gap-2">
                                                     <button onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setIsEditing(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition"><Edit size={16}/></button>
-                                                    <button onClick={(e) => handleDelete(task.id, e)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition"><Trash2 size={16}/></button>
+                                                    <button onClick={(e) => openDeletePrompt(task, e)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition"><Trash2 size={16}/></button>
                                                     {task.status !== 'completed' && (
                                                         <button onClick={(e) => sendReminder(task.assigned_to_id, task.heading, e)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition" title="Send Reminder"><Bell size={16}/></button>
                                                     )}
@@ -199,12 +227,11 @@ const TaskMonitoring = () => {
                     )}
                 </div>
 
-                {/* === TASK DETAIL / EDIT MODAL === */}
+                {/* === TASK EDIT MODAL === */}
                 {selectedTask && (
                     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
                             
-                            {/* Header */}
                             <div className="p-6 border-b flex justify-between items-start bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-800">
@@ -215,7 +242,6 @@ const TaskMonitoring = () => {
                                 <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition"><X size={20} /></button>
                             </div>
 
-                            {/* Body */}
                             <div className="p-6 space-y-6">
                                 {isEditing ? (
                                     <form id="editForm" onSubmit={handleUpdate} className="space-y-4">
@@ -229,7 +255,14 @@ const TaskMonitoring = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">Deadline</label>
-                                            <input type="datetime-local" className="w-full p-2 border rounded mt-1" value={new Date(editFormData.end_date).toISOString().slice(0, 16)} onChange={e => setEditFormData({...editFormData, end_date: e.target.value})} required />
+                                            {/* FIX: Check if date exists before calling toISOString */}
+                                            <input 
+                                                type="datetime-local" 
+                                                className="w-full p-2 border rounded mt-1" 
+                                                value={editFormData.end_date ? new Date(editFormData.end_date).toISOString().slice(0, 16) : ''} 
+                                                onChange={e => setEditFormData({...editFormData, end_date: e.target.value})} 
+                                                required 
+                                            />
                                         </div>
                                         <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
                                             Warning: Modifying this will change the task details for ALL assigned users.
@@ -264,7 +297,6 @@ const TaskMonitoring = () => {
                                 )}
                             </div>
 
-                            {/* Footer */}
                             <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
                                 {isEditing ? (
                                     <>
@@ -278,6 +310,49 @@ const TaskMonitoring = () => {
                         </div>
                     </div>
                 )}
+
+                {/* === DELETE CHOICE MODAL === */}
+                {deleteModal && (
+                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+                            <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Task</h3>
+                            <p className="text-gray-600 mb-6">
+                                You are deleting <b>"{deleteModal.taskTitle}"</b>. Who do you want to remove this task for?
+                            </p>
+                            
+                            <div className="space-y-3">
+                                <button 
+                                    onClick={handleDeleteSingle}
+                                    className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-100 text-blue-600 rounded-full group-hover:bg-blue-600 group-hover:text-white transition"><User size={20}/></div>
+                                        <div className="text-left">
+                                            <p className="font-semibold text-gray-800">Only for {deleteModal.userName}</p>
+                                            <p className="text-xs text-gray-500">Remove assignment for this specific user</p>
+                                        </div>
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={handleDeleteAll}
+                                    className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-red-100 text-red-600 rounded-full group-hover:bg-red-600 group-hover:text-white transition"><Users size={20}/></div>
+                                        <div className="text-left">
+                                            <p className="font-semibold text-gray-800">For Everyone</p>
+                                            <p className="text-xs text-gray-500">Delete this task completely for all users</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <button onClick={() => setDeleteModal(null)} className="w-full mt-4 py-2 text-gray-500 hover:text-gray-800">Cancel</button>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </Layout>
     );

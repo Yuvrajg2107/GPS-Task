@@ -22,5 +22,6 @@ router.get('/admin-stats', verifyToken, checkRole(['admin']), taskController.get
 // Add these new routes:
 router.delete('/:id', verifyToken, checkRole(['admin']), taskController.deleteTask);
 router.put('/:id', verifyToken, checkRole(['admin']), taskController.updateTaskDetails);
+router.delete('/:taskId/assignment/:userId', verifyToken, checkRole(['admin']), taskController.deleteTaskAssignment);
 
 module.exports = router;
