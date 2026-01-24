@@ -219,7 +219,8 @@ const MyTasks = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    href={`http://localhost:5000/${file.file_url.replace(/\\/g, '/')}`} 
+                                                    // FIX IS HERE: Direct link to Cloudinary URL
+                                                    href={file.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     className="group flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:shadow-md transition-all duration-200"

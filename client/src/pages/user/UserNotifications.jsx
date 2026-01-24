@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
-import { Bell, Calendar, X, Paperclip, FileText, Download, User } from 'lucide-react';
+import { Bell, Calendar, X, Paperclip, FileText, Download } from 'lucide-react';
 
 const UserNotifications = () => {
     const [notifs, setNotifs] = useState([]);
@@ -103,8 +103,6 @@ const UserNotifications = () => {
                                             <Calendar size={14} className="text-blue-500"/> 
                                             {new Date(selectedNotif.created_at).toLocaleString()}
                                         </span>
-                                        {/* Optional: Add Sender info if available in API response */}
-                                        {/* <span className="flex items-center gap-1"><User size={14}/> Admin</span> */}
                                     </div>
                                 </div>
                                 <button 
@@ -140,7 +138,8 @@ const UserNotifications = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    href={`http://localhost:5000/${file.file_url.replace(/\\/g, '/')}`} 
+                                                    // FIX IS HERE: Use direct Cloudinary URL
+                                                    href={file.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     className="group flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition text-left"
