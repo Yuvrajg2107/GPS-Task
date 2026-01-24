@@ -28,10 +28,7 @@ exports.createTask = async (req, res) => {
         }
 
         // --- DATE FIXES ---
-        // 1. Format End Date
         const formattedEndDate = new Date(end_date).toISOString().slice(0, 19).replace('T', ' ');
-        
-        // 2. Create Start Date (Current Time)
         const now = new Date();
         const formattedStartDate = now.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -41,9 +38,8 @@ exports.createTask = async (req, res) => {
             [heading, description, assigned_by, formattedEndDate]
         );
         const taskId = taskResult.insertId;
-        console.log("✅ Task Created with ID:", taskId);
 
-        // Step 2: Assign to Users (Bulk Insert with Start Date)
+        // Step 2: Assign to Users
         const assignmentValues = assignedUserIds.map(userId => [
             taskId, 
             userId, 
@@ -55,16 +51,14 @@ exports.createTask = async (req, res) => {
             'INSERT INTO TaskAssignments (task_id, user_id, status, assigned_at) VALUES ?',
             [assignmentValues]
         );
-        console.log("✅ Users Assigned with Start Date");
 
-        // Step 3: Save File Info (If files exist)
+        // Step 3: Save File Info
         if (files.length > 0) {
             const fileValues = files.map(file => [taskId, 'TASK', file.path, file.mimetype]);
             await connection.query(
                 'INSERT INTO Attachments (related_id, related_to, file_url, file_type) VALUES ?',
                 [fileValues]
             );
-            console.log("✅ Files Attached:", files.length);
         }
 
         await connection.commit();
@@ -79,14 +73,13 @@ exports.createTask = async (req, res) => {
     }
 };
 
-// 2. GET TASKS (Updated to SELECT assigned_at)
+// 2. GET TASKS
 exports.getTasks = async (req, res) => {
     try {
         const userId = req.user.id;
         const userRole = req.user.role;
         const { status } = req.query;
 
-        // FIX IS HERE: Added 'ta.assigned_at' to the SELECT list
         let query = `
             SELECT t.id, t.heading, t.description, t.end_date, 
                    ta.status, ta.assigned_at, ta.user_id as assigned_to_id, 
@@ -99,12 +92,11 @@ exports.getTasks = async (req, res) => {
         `;
         let params = [];
 
-        // If User: Show ONLY their tasks
         if (userRole !== 'admin') {
             query += ' WHERE ta.user_id = ?';
             params.push(userId);
         } else {
-            query += ' WHERE 1=1'; // Admin sees all
+            query += ' WHERE 1=1';
         }
 
         if (status) {
@@ -123,7 +115,7 @@ exports.getTasks = async (req, res) => {
     }
 };
 
-// 3. UPDATE TASK STATUS
+// 3. UPDATE TASK STATUS (User Side)
 exports.updateTaskStatus = async (req, res) => {
     try {
         const { taskId } = req.params;
@@ -146,9 +138,8 @@ exports.getUserStats = async (req, res) => {
     try {
         const userId = req.user.id;
         const now = new Date();
-        const next48h = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
+        const next48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-        // Get all tasks for this user
         const query = `
             SELECT t.end_date, ta.status 
             FROM Tasks t
@@ -157,7 +148,6 @@ exports.getUserStats = async (req, res) => {
         `;
         const [tasks] = await db.query(query, [userId]);
 
-        // Calculate Counts
         const stats = {
             total: tasks.length,
             completed: tasks.filter(t => t.status === 'completed').length,
@@ -174,6 +164,7 @@ exports.getUserStats = async (req, res) => {
     }
 };
 
+// 5. GET ATTACHMENTS
 exports.getTaskAttachments = async (req, res) => {
     try {
         const { taskId } = req.params;
@@ -184,16 +175,11 @@ exports.getTaskAttachments = async (req, res) => {
     }
 };
 
-// 5. GET ADMIN DASHBOARD STATS
+// 6. GET ADMIN DASHBOARD STATS
 exports.getAdminStats = async (req, res) => {
     try {
-        // 1. Count Total Users (excluding admins)
         const [userRows] = await db.query("SELECT COUNT(*) as count FROM Users WHERE role != 'admin'");
-        
-        // 2. Count Active Tasks (Status is NOT completed)
         const [activeRows] = await db.query("SELECT COUNT(*) as count FROM TaskAssignments WHERE status != 'completed'");
-
-        // 3. Count Overdue Tasks (End date passed AND not completed)
         const [overdueRows] = await db.query(`
             SELECT COUNT(*) as count 
             FROM TaskAssignments ta 
@@ -209,6 +195,42 @@ exports.getAdminStats = async (req, res) => {
 
     } catch (err) {
         console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ==========================================
+// NEW FUNCTIONS ADDED FOR MODIFY/DELETE
+// ==========================================
+
+// 7. DELETE TASK (Admin Only)
+exports.deleteTask = async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Foreign keys will cascade delete from TaskAssignments and Attachments
+        await db.query('DELETE FROM Tasks WHERE id = ?', [id]);
+        res.json({ message: "Task Deleted Successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 8. UPDATE TASK DETAILS (Admin Only)
+exports.updateTaskDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { heading, description, end_date } = req.body;
+
+        // Format date for MySQL
+        const formattedDate = new Date(end_date).toISOString().slice(0, 19).replace('T', ' ');
+
+        await db.query(
+            'UPDATE Tasks SET heading=?, description=?, end_date=? WHERE id=?',
+            [heading, description, formattedDate, id]
+        );
+
+        res.json({ message: "Task Updated Successfully" });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };

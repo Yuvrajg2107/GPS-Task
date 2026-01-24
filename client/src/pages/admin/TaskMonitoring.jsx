@@ -1,17 +1,42 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
-import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye } from 'lucide-react'; // Added Eye icon
+import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye, Trash2, Edit, X, Save, Paperclip, FileText, Download } from 'lucide-react';
 
 const TaskMonitoring = () => {
     const [tasks, setTasks] = useState([]);
-    const [filter, setFilter] = useState('all'); // all, viewed, completed, pending, overdue, near
+    const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // Modal State
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [attachments, setAttachments] = useState([]);
+    
+    // Edit Form State
+    const [editFormData, setEditFormData] = useState({ heading: '', description: '', end_date: '' });
 
     useEffect(() => {
         fetchTasks();
     }, []);
+
+    // Fetch Attachments when a task is selected
+    useEffect(() => {
+        if (selectedTask) {
+            setAttachments([]); // Reset
+            API.get(`/tasks/${selectedTask.id}/attachments`)
+                .then(res => setAttachments(res.data))
+                .catch(err => console.error(err));
+            
+            // Populate Edit Form
+            setEditFormData({
+                heading: selectedTask.heading,
+                description: selectedTask.description,
+                end_date: selectedTask.end_date
+            });
+        }
+    }, [selectedTask]);
 
     const fetchTasks = async () => {
         try {
@@ -24,7 +49,41 @@ const TaskMonitoring = () => {
         }
     };
 
-    // Helper: Calculate Time Difference
+    const handleDelete = async (id, e) => {
+        e.stopPropagation();
+        if (!window.confirm("Are you sure? This will delete the task for ALL assigned users.")) return;
+        try {
+            await API.delete(`/tasks/${id}`);
+            alert("Task Deleted!");
+            fetchTasks(); // Refresh list
+        } catch (err) {
+            alert("Failed to delete task");
+        }
+    };
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await API.put(`/tasks/${selectedTask.id}`, editFormData);
+            alert("Task Updated Successfully!");
+            setIsEditing(false);
+            setSelectedTask(null);
+            fetchTasks(); // Refresh list
+        } catch (err) {
+            alert("Failed to update task");
+        }
+    };
+
+    const sendReminder = async (userId, taskHeading, e) => {
+        e.stopPropagation(); // Prevent opening modal
+        try {
+            await API.post('/tasks/remind', { user_id: userId, task_heading: taskHeading });
+            alert("Reminder Notification Sent!");
+        } catch (err) {
+            alert("Failed to send reminder");
+        }
+    };
+
     const getTaskStatus = (task) => {
         const now = new Date();
         const end = new Date(task.end_date);
@@ -36,31 +95,19 @@ const TaskMonitoring = () => {
         return task.status;
     };
 
-    // Advanced Filter Logic
     const filteredTasks = tasks.filter(task => {
         const computedStatus = getTaskStatus(task);
         const matchesSearch = task.heading.toLowerCase().includes(searchTerm.toLowerCase());
         
         if (!matchesSearch) return false;
-
         if (filter === 'all') return true;
-        if (filter === 'viewed') return task.status === 'viewed'; // NEW: Specific Viewed Filter
+        if (filter === 'viewed') return task.status === 'viewed';
         if (filter === 'completed') return task.status === 'completed';
-        if (filter === 'pending') return task.status === 'in_progress'; // Changed to match exact status
+        if (filter === 'pending') return task.status === 'in_progress';
         if (filter === 'overdue') return computedStatus === 'overdue' && task.status !== 'completed';
         if (filter === 'near') return computedStatus === 'near' && task.status !== 'completed';
-        
         return true;
     });
-
-    const sendReminder = async (userId, taskHeading) => {
-        try {
-            await API.post('/tasks/remind', { user_id: userId, task_heading: taskHeading });
-            alert("Reminder Notification Sent!");
-        } catch (err) {
-            alert("Failed to send reminder");
-        }
-    };
 
     const getStatusBadge = (status, computed) => {
         if (status === 'completed') return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Completed</span>;
@@ -70,43 +117,38 @@ const TaskMonitoring = () => {
         return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium capitalize">{status.replace('_', ' ')}</span>;
     };
 
+    const getTabColor = (color) => {
+        const colors = { blue: '#2563eb', green: '#16a34a', yellow: '#eab308', red: '#dc2626', orange: '#f97316', purple: '#9333ea' };
+        return colors[color];
+    };
+
     return (
         <Layout>
             <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Task Monitoring</h1>
-                    
-                    {/* Search Bar */}
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                         <input 
-                            type="text" 
-                            placeholder="Search tasks..." 
+                            type="text" placeholder="Search tasks..." 
                             className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                 </div>
 
-                {/* Responsive Filter Tabs */}
                 <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
                     {[
                         { id: 'all', label: 'All', icon: <Filter size={16}/>, color: 'blue' },
-                        { id: 'viewed', label: 'Viewed', icon: <Eye size={16}/>, color: 'purple' }, // NEW BUTTON
+                        { id: 'viewed', label: 'Viewed', icon: <Eye size={16}/>, color: 'purple' },
                         { id: 'pending', label: 'In Progress', icon: <Clock size={16}/>, color: 'yellow' },
                         { id: 'completed', label: 'Completed', icon: <CheckCircle size={16}/>, color: 'green' },
                         { id: 'overdue', label: 'Overdue', icon: <AlertTriangle size={16}/>, color: 'red' },
                         { id: 'near', label: 'Due Soon', icon: <Bell size={16}/>, color: 'orange' },
                     ].map(tab => (
                         <button 
-                            key={tab.id}
-                            onClick={() => setFilter(tab.id)}
-                            className={`px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap transition border ${
-                                filter === tab.id 
-                                ? `bg-${tab.color}-600 text-white border-${tab.color}-600 shadow-md` 
-                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                            }`}
+                            key={tab.id} onClick={() => setFilter(tab.id)}
+                            className={`px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap transition border ${filter === tab.id ? `bg-${tab.color}-600 text-white border-${tab.color}-600 shadow-md` : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                             style={filter === tab.id ? { backgroundColor: getTabColor(tab.color) } : {}}
                         >
                             {tab.icon} {tab.label}
@@ -114,121 +156,131 @@ const TaskMonitoring = () => {
                     ))}
                 </div>
 
-                {/* Content Area */}
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    {loading ? (
-                        <div className="p-10 text-center text-gray-500">Loading tasks...</div>
-                    ) : filteredTasks.length === 0 ? (
-                        <div className="p-10 text-center text-gray-500 flex flex-col items-center">
-                            <Filter size={48} className="text-gray-200 mb-2"/>
-                            <p>No tasks found matching your filters.</p>
+                    {loading ? <div className="p-10 text-center text-gray-500">Loading tasks...</div> : filteredTasks.length === 0 ? <div className="p-10 text-center text-gray-500">No tasks found matching your filters.</div> : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-gray-700 border-b">
+                                    <tr>
+                                        <th className="p-4 font-semibold">Task Heading</th>
+                                        <th className="p-4 font-semibold">Assigned To</th>
+                                        <th className="p-4 font-semibold">Due Date</th>
+                                        <th className="p-4 font-semibold">Status</th>
+                                        <th className="p-4 text-right font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredTasks.map(task => {
+                                        const computedStatus = getTaskStatus(task);
+                                        return (
+                                            <tr key={`${task.id}-${task.assigned_to_id}`} className="border-b hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedTask(task); setIsEditing(false); }}>
+                                                <td className="p-4 font-medium text-gray-800">{task.heading}</td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">{task.assigned_to_name.charAt(0)}</div>
+                                                        <div><div className="text-sm font-semibold">{task.assigned_to_name}</div><div className="text-xs text-gray-500">{task.assigned_to_dept}</div></div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 text-sm text-gray-600">{new Date(task.end_date).toLocaleDateString()}</td>
+                                                <td className="p-4">{getStatusBadge(task.status, computedStatus)}</td>
+                                                <td className="p-4 text-right flex justify-end gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setIsEditing(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition"><Edit size={16}/></button>
+                                                    <button onClick={(e) => handleDelete(task.id, e)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition"><Trash2 size={16}/></button>
+                                                    {task.status !== 'completed' && (
+                                                        <button onClick={(e) => sendReminder(task.assigned_to_id, task.heading, e)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition" title="Send Reminder"><Bell size={16}/></button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
-                    ) : (
-                        <>
-                            {/* DESKTOP VIEW: Table */}
-                            <div className="hidden md:block overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 text-gray-700 border-b">
-                                        <tr>
-                                            <th className="p-4 font-semibold">Task Heading</th>
-                                            <th className="p-4 font-semibold">Assigned To</th>
-                                            <th className="p-4 font-semibold">Due Date</th>
-                                            <th className="p-4 font-semibold">Status</th>
-                                            <th className="p-4 text-right font-semibold">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredTasks.map(task => {
-                                            const computedStatus = getTaskStatus(task);
-                                            return (
-                                                <tr key={`${task.id}-${task.assigned_to_id}`} className="border-b hover:bg-gray-50 transition">
-                                                    <td className="p-4 font-medium text-gray-800">{task.heading}</td>
-                                                    <td className="p-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                                                                {task.assigned_to_name.charAt(0)}
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-sm font-semibold">{task.assigned_to_name}</div>
-                                                                <div className="text-xs text-gray-500">{task.assigned_to_dept}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-4 text-sm text-gray-600">
-                                                        {new Date(task.end_date).toLocaleDateString()} <span className="text-xs text-gray-400">{new Date(task.end_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        {getStatusBadge(task.status, computedStatus)}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {task.status !== 'completed' && (
-                                                            <button 
-                                                                onClick={() => sendReminder(task.assigned_to_id, task.heading)}
-                                                                className="px-3 py-1.5 text-sm bg-white text-blue-600 rounded-md hover:bg-blue-50 border border-blue-200 flex items-center gap-1 ml-auto shadow-sm transition"
-                                                            >
-                                                                <Bell size={14} /> Remind
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* MOBILE VIEW: Cards */}
-                            <div className="md:hidden space-y-4 p-4 bg-gray-50">
-                                {filteredTasks.map(task => {
-                                    const computedStatus = getTaskStatus(task);
-                                    return (
-                                        <div key={`${task.id}-${task.assigned_to_id}`} className="bg-white p-4 rounded-lg shadow-sm border space-y-3">
-                                            <div className="flex justify-between items-start">
-                                                <h3 className="font-bold text-gray-800">{task.heading}</h3>
-                                                {getStatusBadge(task.status, computedStatus)}
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                                                <User size={16} className="text-gray-400"/>
-                                                <span>{task.assigned_to_name} <span className="text-xs text-gray-400">({task.assigned_to_dept})</span></span>
-                                            </div>
-
-                                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                                                <Calendar size={16} className="text-gray-400"/>
-                                                <span>{new Date(task.end_date).toLocaleString()}</span>
-                                            </div>
-
-                                            {task.status !== 'completed' && (
-                                                <button 
-                                                    onClick={() => sendReminder(task.assigned_to_id, task.heading)}
-                                                    className="w-full py-2 mt-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 border border-blue-200 flex items-center justify-center gap-2 transition font-medium"
-                                                >
-                                                    <Bell size={16} /> Send Reminder
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
                     )}
                 </div>
+
+                {/* === TASK DETAIL / EDIT MODAL === */}
+                {selectedTask && (
+                    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+                            
+                            {/* Header */}
+                            <div className="p-6 border-b flex justify-between items-start bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-800">
+                                        {isEditing ? "Modify Task" : selectedTask.heading}
+                                    </h2>
+                                    {!isEditing && <p className="text-sm text-gray-500 mt-1">Assigned to: <b>{selectedTask.assigned_to_name}</b></p>}
+                                </div>
+                                <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition"><X size={20} /></button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="p-6 space-y-6">
+                                {isEditing ? (
+                                    <form id="editForm" onSubmit={handleUpdate} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Heading</label>
+                                            <input type="text" className="w-full p-2 border rounded mt-1" value={editFormData.heading} onChange={e => setEditFormData({...editFormData, heading: e.target.value})} required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Description</label>
+                                            <textarea className="w-full p-2 border rounded mt-1" rows="4" value={editFormData.description} onChange={e => setEditFormData({...editFormData, description: e.target.value})} required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Deadline</label>
+                                            <input type="datetime-local" className="w-full p-2 border rounded mt-1" value={new Date(editFormData.end_date).toISOString().slice(0, 16)} onChange={e => setEditFormData({...editFormData, end_date: e.target.value})} required />
+                                        </div>
+                                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                                            Warning: Modifying this will change the task details for ALL assigned users.
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <>
+                                        <div className="text-gray-700 bg-gray-50 p-4 rounded-lg border">{selectedTask.description}</div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-3 bg-blue-50 rounded-lg"><h3 className="text-xs font-bold text-blue-500">Assigned</h3><p className="text-blue-900 font-medium">{new Date(selectedTask.assigned_at).toLocaleString()}</p></div>
+                                            <div className="p-3 bg-red-50 rounded-lg"><h3 className="text-xs font-bold text-red-500">Deadline</h3><p className="text-red-900 font-medium">{new Date(selectedTask.end_date).toLocaleString()}</p></div>
+                                        </div>
+                                        
+                                        {/* Attachments */}
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Paperclip size={16}/> Attachments</h3>
+                                            {attachments.length === 0 ? <p className="text-sm text-gray-400 italic">No files.</p> : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {attachments.map(file => (
+                                                        <a key={file.id} href={file.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-white border rounded hover:border-blue-400 transition group">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <FileText size={18} className="text-blue-500 flex-shrink-0"/>
+                                                                <span className="text-sm truncate">{file.file_url.split(/[\\/]/).pop()}</span>
+                                                            </div>
+                                                            <Download size={14} className="text-gray-400 group-hover:text-blue-600"/>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+                                {isEditing ? (
+                                    <>
+                                        <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded">Cancel</button>
+                                        <button type="submit" form="editForm" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"><Save size={16}/> Save Changes</button>
+                                    </>
+                                ) : (
+                                    <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"><Edit size={16}/> Modify Task</button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </Layout>
     );
-};
-
-// Helper for dynamic colors
-const getTabColor = (color) => {
-    const colors = {
-        blue: '#2563eb',
-        green: '#16a34a',
-        yellow: '#eab308',
-        red: '#dc2626',
-        orange: '#f97316',
-        purple: '#9333ea' // Added purple for Viewed
-    };
-    return colors[color];
 };
 
 export default TaskMonitoring;

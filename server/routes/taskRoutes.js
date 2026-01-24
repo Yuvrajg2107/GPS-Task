@@ -19,5 +19,8 @@ router.post('/remind', verifyToken, checkRole(['admin']), notificationController
 
 router.get('/:taskId/attachments', verifyToken, taskController.getTaskAttachments);
 router.get('/admin-stats', verifyToken, checkRole(['admin']), taskController.getAdminStats);
+// Add these new routes:
+router.delete('/:id', verifyToken, checkRole(['admin']), taskController.deleteTask);
+router.put('/:id', verifyToken, checkRole(['admin']), taskController.updateTaskDetails);
 
 module.exports = router;
