@@ -12,23 +12,28 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Configure Storage Engine with Dynamic Resource Type
+// 2. Configure Storage Engine
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
-        // Check file mimetype to determine correct resource_type
-        const isRaw = file.mimetype.includes('pdf') || 
-                      file.mimetype.includes('document') || 
-                      file.mimetype.includes('text');
+        
+        // Check if the file is an image (png, jpg, jpeg, gif, etc.)
+        const isImage = file.mimetype.startsWith('image/');
 
         return {
             folder: 'task-manager-uploads',
-            // 'raw' keeps PDFs/Docs as original files. 'image' optimizes photos.
-            resource_type: isRaw ? 'raw' : 'image', 
-            // Keep original filename to prevent "unnamed" downloads
-            public_id: file.originalname.split('.')[0], 
-            // Use original extension for raw files to ensure browser recognizes them
-            format: isRaw ? undefined : file.mimetype.split('/')[1] 
+            
+            // CRITICAL FIX: 
+            // If it's an image, use 'image'. For PDF, Word, Excel, PPT, use 'raw'.
+            resource_type: isImage ? 'image' : 'raw', 
+            
+            // Keep the original filename + current time to avoid duplicates
+            // We append the extension manually for 'raw' files so they download correctly
+            public_id: file.originalname.split('.')[0] + "_" + Date.now(),
+            
+            // 'format' ensures images get the right extension. 
+            // For 'raw' files, we leave it undefined (Cloudinary uses the upload content).
+            format: isImage ? undefined : file.originalname.split('.').pop()
         };
     },
 });
