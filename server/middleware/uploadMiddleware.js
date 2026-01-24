@@ -12,13 +12,24 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Configure Storage Engine
+// 2. Configure Storage Engine with Dynamic Resource Type
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'task-manager-uploads', // Folder name in Cloudinary
-        allowed_formats: ['jpg', 'png', 'pdf', 'docx', 'txt'],
-        resource_type: 'auto' // Auto-detects image vs raw file (pdf/docs)
+    params: async (req, file) => {
+        // Check file mimetype to determine correct resource_type
+        const isRaw = file.mimetype.includes('pdf') || 
+                      file.mimetype.includes('document') || 
+                      file.mimetype.includes('text');
+
+        return {
+            folder: 'task-manager-uploads',
+            // 'raw' keeps PDFs/Docs as original files. 'image' optimizes photos.
+            resource_type: isRaw ? 'raw' : 'image', 
+            // Keep original filename to prevent "unnamed" downloads
+            public_id: file.originalname.split('.')[0], 
+            // Use original extension for raw files to ensure browser recognizes them
+            format: isRaw ? undefined : file.mimetype.split('/')[1] 
+        };
     },
 });
 
