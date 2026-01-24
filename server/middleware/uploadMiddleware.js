@@ -5,35 +5,39 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// 1. Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Configure Storage Engine
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
         
-        // Check if the file is an image (png, jpg, jpeg, gif, etc.)
+        // 1. Check if it's an image
         const isImage = file.mimetype.startsWith('image/');
+        
+        // 2. Get the file extension (e.g., "pdf", "docx")
+        const fileExtension = file.originalname.split('.').pop();
+        // Get the name without extension (e.g., "report")
+        const fileNameBase = file.originalname.replace(/\.[^/.]+$/, ""); 
 
         return {
             folder: 'task-manager-uploads',
             
-            // CRITICAL FIX: 
-            // If it's an image, use 'image'. For PDF, Word, Excel, PPT, use 'raw'.
+            // 3. Set Resource Type
             resource_type: isImage ? 'image' : 'raw', 
             
-            // Keep the original filename + current time to avoid duplicates
-            // We append the extension manually for 'raw' files so they download correctly
-            public_id: file.originalname.split('.')[0] + "_" + Date.now(),
+            // 4. CRITICAL FIX: Manually append extension for Raw files
+            // If it's a PDF/Doc, we MUST add "." + extension to the ID.
+            // If it's an Image, Cloudinary handles it automatically.
+            public_id: isImage 
+                ? `${fileNameBase}_${Date.now()}` 
+                : `${fileNameBase}_${Date.now()}.${fileExtension}`,
             
-            // 'format' ensures images get the right extension. 
-            // For 'raw' files, we leave it undefined (Cloudinary uses the upload content).
-            format: isImage ? undefined : file.originalname.split('.').pop()
+            // Format is not needed for raw files if public_id has the extension
+            format: undefined
         };
     },
 });
