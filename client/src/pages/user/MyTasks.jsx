@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
-import { Clock, Paperclip, X, AlertCircle, FileText, Download, Calendar, CheckCircle2, AlertTriangle, Briefcase } from 'lucide-react';
+import { Clock, Paperclip, X, AlertCircle, FileText, Download, Calendar, CheckCircle2, Briefcase } from 'lucide-react';
 
 const MyTasks = () => {
     const [tasks, setTasks] = useState([]);
@@ -46,6 +46,13 @@ const MyTasks = () => {
         } catch (err) {
             alert("Failed to update status");
         }
+    };
+
+    // Helper to prevent "Invalid Date" crashes
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     };
 
     const isNearDeadline = (dateString) => {
@@ -132,11 +139,7 @@ const MyTasks = () => {
                                     <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded-lg">
                                         <Calendar size={14} className="text-blue-500" />
                                         <span className={near ? 'text-red-600 font-medium' : ''}>
-                                            {new Date(task.end_date).toLocaleDateString()}
-                                        </span>
-                                        <span className="text-gray-300">|</span>
-                                        <span className="text-xs">
-                                            {new Date(task.end_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            {formatDate(task.end_date)}
                                         </span>
                                     </div>
 
@@ -167,7 +170,7 @@ const MyTasks = () => {
                                     <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
                                         <span className="bg-white border px-2 py-0.5 rounded text-xs">Assigned by: <b>{selectedTask.assigned_by_name}</b></span>
                                         <span>•</span>
-                                        <span>{new Date(selectedTask.assigned_at).toLocaleDateString()}</span>
+                                        <span>{formatDate(selectedTask.assigned_at)}</span>
                                     </div>
                                 </div>
                                 <button 
@@ -192,14 +195,14 @@ const MyTasks = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                                         <h3 className="text-xs font-bold text-blue-400 uppercase mb-1">Assigned Date</h3>
-                                        <p className="text-blue-900 font-medium">{new Date(selectedTask.assigned_at).toLocaleString()}</p>
+                                        <p className="text-blue-900 font-medium">{formatDate(selectedTask.assigned_at)}</p>
                                     </div>
                                     <div className={`p-4 rounded-xl border ${new Date(selectedTask.end_date) < new Date() ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
                                         <h3 className={`text-xs font-bold uppercase mb-1 ${new Date(selectedTask.end_date) < new Date() ? 'text-red-400' : 'text-green-400'}`}>
                                             Deadline
                                         </h3>
                                         <p className={`font-medium ${new Date(selectedTask.end_date) < new Date() ? 'text-red-900' : 'text-green-900'}`}>
-                                            {new Date(selectedTask.end_date).toLocaleString()}
+                                            {formatDate(selectedTask.end_date)}
                                         </p>
                                     </div>
                                 </div>
@@ -219,7 +222,7 @@ const MyTasks = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    // FIX IS HERE: Direct link to Cloudinary URL
+                                                    // FIX: Use full Cloudinary URL directly
                                                     href={file.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"

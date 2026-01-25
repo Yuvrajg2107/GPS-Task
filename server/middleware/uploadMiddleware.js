@@ -5,40 +5,38 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// 1. Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Configure Storage Engine
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
         
-        // Smart Type Detection
-        // Images AND PDFs should be 'auto' so Cloudinary can display them.
-        // Word/Excel/Zip must be 'raw' to prevent corruption.
-        const isAuto = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+        // 1. Identify if it is an image
+        const isImage = file.mimetype.startsWith('image/');
         
-        // Prepare Filename
+        // 2. Extract extension and clean filename
         const fileExtension = file.originalname.split('.').pop();
-        const fileNameBase = file.originalname.replace(/\.[^/.]+$/, "");
+        // Remove existing extension from name to avoid duplication (e.g. file.pdf.pdf)
+        const fileNameBase = file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
+
         const uniqueSuffix = Date.now();
 
-        if (isAuto) {
+        if (isImage) {
             return {
                 folder: 'task-manager-uploads',
-                resource_type: 'auto', // Cloudinary detects PDF/Image automatically
-                public_id: `${fileNameBase}_${uniqueSuffix}`, // Cloudinary ADDS extension automatically here
+                resource_type: 'image', // Cloudinary optimizes images
+                public_id: `${fileNameBase}_${uniqueSuffix}`,
             };
         } else {
             return {
                 folder: 'task-manager-uploads',
-                resource_type: 'raw', // Treat Word/Excel as raw files
-                public_id: `${fileNameBase}_${uniqueSuffix}.${fileExtension}`, // Manually ADD extension for Raw
-                format: undefined
+                resource_type: 'raw', // Treat PDF/Docs as raw to prevent corruption
+                // CRITICAL FIX: Manually append the extension for raw files
+                public_id: `${fileNameBase}_${uniqueSuffix}.${fileExtension}`, 
             };
         }
     },
