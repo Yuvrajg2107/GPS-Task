@@ -1,4 +1,11 @@
 const db = require('../db');
+const { createClient } = require('@supabase/supabase-js');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+// Initialize Supabase for Deletion operations
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // 1. CREATE TASK (Admin Only)
 exports.createTask = async (req, res) => {
@@ -10,7 +17,6 @@ exports.createTask = async (req, res) => {
 
         const { heading, description, end_date, assigned_to } = req.body;
         const assigned_by = req.user.id;
-        // Middleware has already processed files and set file.path to Supabase URL
         const files = req.files || []; 
 
         if (!heading || !assigned_to) {
@@ -116,7 +122,7 @@ exports.getTasks = async (req, res) => {
     }
 };
 
-// 3. UPDATE TASK STATUS (User Side)
+// 3. UPDATE TASK STATUS
 exports.updateTaskStatus = async (req, res) => {
     try {
         const { taskId } = req.params;
@@ -134,7 +140,7 @@ exports.updateTaskStatus = async (req, res) => {
     }
 };
 
-// 4. GET USER DASHBOARD STATS
+// 4. GET USER STATS
 exports.getUserStats = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -176,7 +182,7 @@ exports.getTaskAttachments = async (req, res) => {
     }
 };
 
-// 6. GET ADMIN DASHBOARD STATS
+// 6. GET ADMIN STATS
 exports.getAdminStats = async (req, res) => {
     try {
         const [userRows] = await db.query("SELECT COUNT(*) as count FROM Users WHERE role != 'admin'");
@@ -200,25 +206,52 @@ exports.getAdminStats = async (req, res) => {
     }
 };
 
-// 7. DELETE TASK (Admin Only)
+// 7. DELETE TASK (Updated to Delete Files from Supabase)
 exports.deleteTask = async (req, res) => {
     try {
         const { id } = req.params;
-        // Foreign keys will cascade delete from TaskAssignments and Attachments
+
+        // 1. Fetch file URLs associated with this task
+        const [files] = await db.query(
+            'SELECT file_url FROM Attachments WHERE related_id = ? AND related_to = "TASK"', 
+            [id]
+        );
+
+        // 2. Delete files from Supabase Storage
+        if (files.length > 0) {
+            // Extract filenames from URLs
+            // URL format: .../task-files/173..._filename.pdf
+            const filePaths = files.map(f => {
+                const parts = f.file_url.split('/task-files/');
+                return parts.length > 1 ? parts[1] : null;
+            }).filter(p => p !== null);
+
+            if (filePaths.length > 0) {
+                const { error } = await supabase.storage
+                    .from('task-files')
+                    .remove(filePaths);
+                
+                if (error) console.error("Supabase File Delete Error:", error);
+                else console.log("Deleted files:", filePaths);
+            }
+        }
+
+        // 3. Delete Task from DB (Cascade will remove Assignments & Attachments rows)
         await db.query('DELETE FROM Tasks WHERE id = ?', [id]);
-        res.json({ message: "Task Deleted Successfully" });
+        res.json({ message: "Task and associated files deleted successfully" });
+
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 };
 
-// 8. UPDATE TASK DETAILS (Admin Only)
+// 8. UPDATE TASK DETAILS
 exports.updateTaskDetails = async (req, res) => {
     try {
         const { id } = req.params;
         const { heading, description, end_date } = req.body;
 
-        // Format date for MySQL
         const formattedDate = new Date(end_date).toISOString().slice(0, 19).replace('T', ' ');
 
         await db.query(
@@ -232,17 +265,14 @@ exports.updateTaskDetails = async (req, res) => {
     }
 };
 
-// 9. DELETE ASSIGNMENT (Remove task for ONE specific user)
+// 9. DELETE ASSIGNMENT
 exports.deleteTaskAssignment = async (req, res) => {
     try {
         const { taskId, userId } = req.params;
-        
-        // Only delete the row in TaskAssignments
         await db.query(
             'DELETE FROM TaskAssignments WHERE task_id = ? AND user_id = ?', 
             [taskId, userId]
         );
-        
         res.json({ message: "Task removed for this user" });
     } catch (err) {
         res.status(500).json({ error: err.message });
