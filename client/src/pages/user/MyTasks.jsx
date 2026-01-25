@@ -226,8 +226,8 @@ const MyTasks = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    // FIX: Use file.file_url directly (Cloudinary URL)
-                                                    href={file.file_url} 
+                                                    // FIX: FORCE HTTPS to prevent "Failed to load" errors
+                                                    href={file.file_url?.replace(/^http:/, "https:")} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     className="group flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:shadow-md transition-all duration-200"

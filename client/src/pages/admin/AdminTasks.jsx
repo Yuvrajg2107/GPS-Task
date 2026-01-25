@@ -69,9 +69,10 @@ const AdminTasks = () => {
         });
 
         try {
-            await API.post('/tasks/create', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // FIX: REMOVED manual 'Content-Type' header. 
+            // Axios/Browser creates the correct boundary automatically when it sees FormData.
+            await API.post('/tasks/create', formData);
+            
             alert("Task Assigned Successfully!");
             setStep(1);
             setSelectedUsers([]);
@@ -136,9 +137,7 @@ const AdminTasks = () => {
                         </div>
 
                         {/* User List Area (Scrollable) */}
-                        {/* flex-1 overflow-y-auto makes THIS section scroll while parent stays fixed */}
                         <div className="flex-1 overflow-y-auto rounded-lg border border-gray-100 min-h-0">
-                            
                             {/* Desktop View: Table */}
                             <table className="hidden md:table w-full text-left">
                                 <thead className="bg-gray-50 sticky top-0 z-10">
