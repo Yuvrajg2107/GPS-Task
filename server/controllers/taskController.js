@@ -10,6 +10,7 @@ exports.createTask = async (req, res) => {
 
         const { heading, description, end_date, assigned_to } = req.body;
         const assigned_by = req.user.id;
+        // Middleware has already processed files and set file.path to Supabase URL
         const files = req.files || []; 
 
         if (!heading || !assigned_to) {
@@ -199,10 +200,6 @@ exports.getAdminStats = async (req, res) => {
     }
 };
 
-// ==========================================
-// NEW FUNCTIONS ADDED FOR MODIFY/DELETE
-// ==========================================
-
 // 7. DELETE TASK (Admin Only)
 exports.deleteTask = async (req, res) => {
     try {
@@ -235,8 +232,6 @@ exports.updateTaskDetails = async (req, res) => {
     }
 };
 
-// ... (keep all existing code)
-
 // 9. DELETE ASSIGNMENT (Remove task for ONE specific user)
 exports.deleteTaskAssignment = async (req, res) => {
     try {
@@ -247,9 +242,6 @@ exports.deleteTaskAssignment = async (req, res) => {
             'DELETE FROM TaskAssignments WHERE task_id = ? AND user_id = ?', 
             [taskId, userId]
         );
-
-        // Optional: Check if any assignments remain. If 0, maybe delete the Task parent?
-        // For now, we just remove the link.
         
         res.json({ message: "Task removed for this user" });
     } catch (err) {

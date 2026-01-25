@@ -1,27 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
+const notificationController = require('../controllers/notificationController');
 const { verifyToken, checkRole } = require('../middleware/authMiddleware');
-const notificationController = require('../controllers/notificationController'); // Import this
-const upload = require('../middleware/uploadMiddleware');
 
-// Create Task (Admin only, handles multiple files)
-router.post('/create', verifyToken, checkRole(['admin']), upload.array('files'), taskController.createTask);
+// FIX: Import both the Multer config AND the Supabase uploader
+const { upload, uploadToSupabase } = require('../middleware/uploadMiddleware');
 
-// Get Tasks (Admin sees all, Users see theirs)
+// === ROUTES ===
+
+// Create Task (Admin only)
+router.post('/create', 
+    verifyToken, 
+    checkRole(['admin']), 
+    upload.array('files'), // Step 1: Multer grabs files from request
+    uploadToSupabase,      // Step 2: Uploads to Supabase & gets public URL
+    taskController.createTask // Step 3: Saves task with file URL to DB
+);
+
+// Get Tasks
 router.get('/', verifyToken, taskController.getTasks);
 
+// Stats
 router.get('/stats', verifyToken, taskController.getUserStats);
+router.get('/admin-stats', verifyToken, checkRole(['admin']), taskController.getAdminStats);
 
-// Update Status (Users update their own status)
+// Update Status & Details
 router.put('/:taskId/status', verifyToken, taskController.updateTaskStatus);
+router.put('/:id', verifyToken, checkRole(['admin']), taskController.updateTaskDetails);
+
+// Reminder
 router.post('/remind', verifyToken, checkRole(['admin']), notificationController.sendReminder);
 
+// Attachments
 router.get('/:taskId/attachments', verifyToken, taskController.getTaskAttachments);
-router.get('/admin-stats', verifyToken, checkRole(['admin']), taskController.getAdminStats);
-// Add these new routes:
+
+// Deletion
 router.delete('/:id', verifyToken, checkRole(['admin']), taskController.deleteTask);
-router.put('/:id', verifyToken, checkRole(['admin']), taskController.updateTaskDetails);
 router.delete('/:taskId/assignment/:userId', verifyToken, checkRole(['admin']), taskController.deleteTaskAssignment);
 
 module.exports = router;

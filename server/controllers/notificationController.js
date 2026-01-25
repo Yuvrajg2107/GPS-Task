@@ -1,6 +1,6 @@
 const db = require('../db');
 
-// 1. Create Notification (Updated for Schema Change)
+// 1. Create Notification
 exports.createNotification = async (req, res) => {
     const connection = await db.getConnection();
     try {
@@ -8,7 +8,7 @@ exports.createNotification = async (req, res) => {
 
         const { title, message, target_dept, target_role, specific_recipient_ids } = req.body;
         const sender_id = req.user.id;
-        const files = req.files || [];
+        const files = req.files || []; // Middleware has added .path here
 
         // 1. Insert the Main Message
         const [result] = await connection.query(
@@ -17,7 +17,7 @@ exports.createNotification = async (req, res) => {
         );
         const notificationId = result.insertId;
 
-        // 2. Handle Specific Recipients (Insert into Mapping Table)
+        // 2. Handle Specific Recipients
         if (specific_recipient_ids) {
             const recipients = JSON.parse(specific_recipient_ids);
             if (recipients.length > 0) {
@@ -50,7 +50,7 @@ exports.createNotification = async (req, res) => {
     }
 };
 
-// 2. Get All Notifications (Admin History - Updated to show names)
+// 2. Get All Notifications (Admin History)
 exports.getAllNotifications = async (req, res) => {
     try {
         const { search } = req.query;
@@ -69,7 +69,6 @@ exports.getAllNotifications = async (req, res) => {
             params.push(`%${search}%`);
         }
 
-        // Group by Notification ID so we don't get duplicate rows
         query += " GROUP BY n.id ORDER BY n.created_at DESC";
 
         const [notifs] = await db.query(query, params);
@@ -79,35 +78,11 @@ exports.getAllNotifications = async (req, res) => {
     }
 };
 
-// ... keep deleteNotification and getMyNotifications same ...
-
-// 2. Get My Notifications (Logic to fetch correct messages)
-// 4. Get My Notifications (Updated)
+// 3. Get My Notifications
 exports.getMyNotifications = async (req, res) => {
     try {
         const { department, role, id } = req.user;
         
-        // Logic: 
-        // 1. Message targets my Dept
-        // 2. Message targets my Role
-        // 3. Message is linked to ME in NotificationRecipients table
-        const query = `
-            SELECT DISTINCT n.* FROM Notifications n
-            LEFT JOIN NotificationRecipients nr ON n.id = nr.notification_id
-            WHERE 
-            (n.target_dept = ? OR n.target_dept IS NULL) 
-            AND (n.target_role = ? OR n.target_role IS NULL)
-            AND (
-                (n.target_dept IS NOT NULL OR n.target_role IS NOT NULL) -- Broadcast/Group
-                OR nr.user_id = ? -- Specific
-                OR (n.target_dept IS NULL AND n.target_role IS NULL AND nr.user_id IS NULL) -- Everyone (if implemented that way)
-            )
-            ORDER BY n.created_at DESC
-        `;
-        // Simplified Logic for "Everyone" support:
-        // If target_dept & target_role are NULL and NO specific recipients exist, it's for everyone.
-        
-        // Let's use a robust query:
         const robustQuery = `
             SELECT DISTINCT n.* FROM Notifications n
             LEFT JOIN NotificationRecipients nr ON n.id = nr.notification_id
@@ -127,8 +102,7 @@ exports.getMyNotifications = async (req, res) => {
     }
 };
 
-// Send a Reminder (Admin triggers this)
-// 5. Send a Reminder (Fixed for New Schema)
+// 4. Send Reminder
 exports.sendReminder = async (req, res) => {
     const connection = await db.getConnection();
     try {
@@ -140,15 +114,12 @@ exports.sendReminder = async (req, res) => {
         const title = "Task Reminder";
         const message = `Reminder: Your task "${task_heading}" is pending or nearing its deadline. Please update the status.`;
 
-        // 1. Insert Notification (General Info)
-        // Note: We DO NOT insert specific_recipient_id anymore.
         const [result] = await connection.query(
             'INSERT INTO Notifications (title, message, sender_id) VALUES (?, ?, ?)',
             [title, message, sender_id]
         );
         const notificationId = result.insertId;
 
-        // 2. Insert into Mapping Table (Link to the specific user)
         await connection.query(
             'INSERT INTO NotificationRecipients (notification_id, user_id) VALUES (?, ?)',
             [notificationId, user_id]
@@ -166,9 +137,7 @@ exports.sendReminder = async (req, res) => {
     }
 };
 
-
-
-// 3. Delete Notification
+// 5. Delete Notification
 exports.deleteNotification = async (req, res) => {
     try {
         const { id } = req.params;
@@ -179,7 +148,7 @@ exports.deleteNotification = async (req, res) => {
     }
 };
 
-// 6. Get Attachments for a specific Notification
+// 6. Get Attachments
 exports.getAttachments = async (req, res) => {
     try {
         const { id } = req.params;
