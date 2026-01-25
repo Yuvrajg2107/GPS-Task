@@ -1,15 +1,17 @@
 import { useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom'; 
 import AuthContext from '../context/AuthContext';
+import { Eye, EyeOff } from 'lucide-react'; // 1. Import Icons
 
 const Login = () => {
     const { login, user, loading } = useContext(AuthContext);
-    const navigate = useNavigate(); // Hook for navigation
+    const navigate = useNavigate(); 
 
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false); // 2. State for toggle
 
-    // 1. AUTO-REDIRECT: If user is already logged in, send them to their page
+    // 1. AUTO-REDIRECT
     useEffect(() => {
         if (!loading && user) {
             if (user.role === 'admin') {
@@ -25,7 +27,6 @@ const Login = () => {
         login(phone, password);
     };
 
-    // 2. Prevent flickering: Don't show form while checking auth status
     if (loading) return null; 
 
     return (
@@ -51,14 +52,25 @@ const Login = () => {
                     
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Password</label>
-                        <input 
-                            type="password" 
-                            required 
-                            placeholder="Enter your password"
-                            className="w-full px-4 py-3 mt-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
+                        <div className="relative mt-1"> {/* Relative container needed for absolute positioning */}
+                            <input 
+                                type={showPassword ? "text" : "password"} // 3. Dynamic Type
+                                required 
+                                placeholder="Enter your password"
+                                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none pr-12" // Added pr-12 for space
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                            
+                            {/* 4. Eye Button */}
+                            <button
+                                type="button" // Prevent form submission
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 flex items-center px-4 text-gray-500 hover:text-blue-600 focus:outline-none"
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
                     </div>
 
                     <button 
