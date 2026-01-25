@@ -15,40 +15,32 @@ const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
         
-        // 1. Determine File Type
+        // 1. Check if it is strictly an image file (jpg, png, etc.)
         const isImage = file.mimetype.startsWith('image/');
-        const isPdf = file.mimetype === 'application/pdf';
         
-        // Clean filename (remove spaces/special chars)
-        const fileNameBase = file.originalname.split('.')[0].replace(/[^a-zA-Z0-9]/g, "_");
+        // 2. Prepare the filename
+        // Clean special characters to prevent URL issues
+        const fileExtension = file.originalname.split('.').pop();
+        const fileNameBase = file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
         const uniqueSuffix = Date.now();
 
-        // 2. CONFIGURATION LOGIC
+        // 3. Logic
         if (isImage) {
+            // Images: Use 'image' resource_type so Cloudinary can resize/optimize them
             return {
                 folder: 'task-manager-uploads',
                 resource_type: 'image', 
                 public_id: `${fileNameBase}_${uniqueSuffix}`,
             };
-        } 
-        else if (isPdf) {
-            // FIX: Treat PDF as 'auto' so Cloudinary sees it as a document
-            // AND explicitly set format to 'pdf' to ensure the URL ends in .pdf
+        } else {
+            // PDFs, Docs, Excel: Use 'raw' resource_type.
+            // This prevents Cloudinary from trying to "process" the PDF, which was causing the crash.
+            // CRITICAL: We MUST manually add the extension (e.g., .pdf) to the public_id here.
             return {
                 folder: 'task-manager-uploads',
-                resource_type: 'auto',
-                public_id: `${fileNameBase}_${uniqueSuffix}`,
-                format: 'pdf' 
-            };
-        } 
-        else {
-            // Word, Excel, Zip -> Keep as 'raw' to avoid corruption
-            // Must manually append extension for raw files
-            const ext = file.originalname.split('.').pop();
-            return {
-                folder: 'task-manager-uploads',
-                resource_type: 'raw',
-                public_id: `${fileNameBase}_${uniqueSuffix}.${ext}`,
+                resource_type: 'raw', 
+                public_id: `${fileNameBase}_${uniqueSuffix}.${fileExtension}`,
+                format: undefined // Raw files don't use the format parameter
             };
         }
     },
