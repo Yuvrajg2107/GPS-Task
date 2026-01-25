@@ -15,28 +15,40 @@ const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
         
-        // 1. Identify if it is an image
+        // 1. Determine File Type
         const isImage = file.mimetype.startsWith('image/');
+        const isPdf = file.mimetype === 'application/pdf';
         
-        // 2. Extract extension and clean filename
-        const fileExtension = file.originalname.split('.').pop();
-        // Remove existing extension from name to avoid duplication (e.g. file.pdf.pdf)
-        const fileNameBase = file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
-
+        // Clean filename (remove spaces/special chars)
+        const fileNameBase = file.originalname.split('.')[0].replace(/[^a-zA-Z0-9]/g, "_");
         const uniqueSuffix = Date.now();
 
+        // 2. CONFIGURATION LOGIC
         if (isImage) {
             return {
                 folder: 'task-manager-uploads',
-                resource_type: 'image', // Cloudinary optimizes images
+                resource_type: 'image', 
                 public_id: `${fileNameBase}_${uniqueSuffix}`,
             };
-        } else {
+        } 
+        else if (isPdf) {
+            // FIX: Treat PDF as 'auto' so Cloudinary sees it as a document
+            // AND explicitly set format to 'pdf' to ensure the URL ends in .pdf
             return {
                 folder: 'task-manager-uploads',
-                resource_type: 'raw', // Treat PDF/Docs as raw to prevent corruption
-                // CRITICAL FIX: Manually append the extension for raw files
-                public_id: `${fileNameBase}_${uniqueSuffix}.${fileExtension}`, 
+                resource_type: 'auto',
+                public_id: `${fileNameBase}_${uniqueSuffix}`,
+                format: 'pdf' 
+            };
+        } 
+        else {
+            // Word, Excel, Zip -> Keep as 'raw' to avoid corruption
+            // Must manually append extension for raw files
+            const ext = file.originalname.split('.').pop();
+            return {
+                folder: 'task-manager-uploads',
+                resource_type: 'raw',
+                public_id: `${fileNameBase}_${uniqueSuffix}.${ext}`,
             };
         }
     },

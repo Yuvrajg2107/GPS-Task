@@ -48,11 +48,13 @@ const MyTasks = () => {
         }
     };
 
-    // Helper to prevent "Invalid Date" crashes
+    // --- FIX: Safe Date Formatter to prevent crashes ---
     const formatDate = (dateString) => {
         if (!dateString) return "N/A";
         const date = new Date(dateString);
-        return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        // Check if date is invalid
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     };
 
     const isNearDeadline = (dateString) => {
@@ -139,6 +141,7 @@ const MyTasks = () => {
                                     <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded-lg">
                                         <Calendar size={14} className="text-blue-500" />
                                         <span className={near ? 'text-red-600 font-medium' : ''}>
+                                            {/* FIX: Use helper function */}
                                             {formatDate(task.end_date)}
                                         </span>
                                     </div>
@@ -170,6 +173,7 @@ const MyTasks = () => {
                                     <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
                                         <span className="bg-white border px-2 py-0.5 rounded text-xs">Assigned by: <b>{selectedTask.assigned_by_name}</b></span>
                                         <span>•</span>
+                                        {/* FIX: Use helper function */}
                                         <span>{formatDate(selectedTask.assigned_at)}</span>
                                     </div>
                                 </div>
@@ -222,7 +226,7 @@ const MyTasks = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    // FIX: Use full Cloudinary URL directly
+                                                    // FIX: Use file.file_url directly (Cloudinary URL)
                                                     href={file.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"

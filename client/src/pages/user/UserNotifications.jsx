@@ -35,6 +35,14 @@ const UserNotifications = () => {
         }
     };
 
+    // --- FIX: Safe Date Formatter ---
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString();
+    };
+
     return (
         <Layout>
             <div className="max-w-5xl mx-auto">
@@ -79,7 +87,8 @@ const UserNotifications = () => {
                                     <div className="flex justify-between items-start">
                                         <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-700 transition">{n.title}</h3>
                                         <span className="text-xs text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-full whitespace-nowrap">
-                                            <Calendar size={12} /> {new Date(n.created_at).toLocaleDateString()}
+                                            {/* FIX: Use helper */}
+                                            <Calendar size={12} /> {formatDate(n.created_at)}
                                         </span>
                                     </div>
                                     <p className="text-gray-600 mt-1 line-clamp-2 text-sm">{n.message}</p>
@@ -138,7 +147,7 @@ const UserNotifications = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    // FIX IS HERE: Use direct Cloudinary URL
+                                                    // FIX: Direct Cloudinary URL
                                                     href={file.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"

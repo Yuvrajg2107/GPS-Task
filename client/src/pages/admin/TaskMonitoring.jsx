@@ -16,13 +16,12 @@ const TaskMonitoring = () => {
     const [editFormData, setEditFormData] = useState({ heading: '', description: '', end_date: '' });
 
     // Delete Choice Modal State
-    const [deleteModal, setDeleteModal] = useState(null); // Stores { taskId, userId, userName, taskTitle }
+    const [deleteModal, setDeleteModal] = useState(null); 
 
     useEffect(() => {
         fetchTasks();
     }, []);
 
-    // Fetch Attachments & Setup Edit Form when task is selected
     useEffect(() => {
         if (selectedTask) {
             setAttachments([]); 
@@ -49,9 +48,15 @@ const TaskMonitoring = () => {
         }
     };
 
+    // --- FIX: Safe Date Formatter ---
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString();
+    };
+
     // --- DELETE LOGIC ---
-    
-    // 1. Open the choice modal
     const openDeletePrompt = (task, e) => {
         e.stopPropagation();
         setDeleteModal({
@@ -62,7 +67,6 @@ const TaskMonitoring = () => {
         });
     };
 
-    // 2. Delete for SINGLE User
     const handleDeleteSingle = async () => {
         try {
             await API.delete(`/tasks/${deleteModal.taskId}/assignment/${deleteModal.userId}`);
@@ -74,7 +78,6 @@ const TaskMonitoring = () => {
         }
     };
 
-    // 3. Delete for EVERYONE
     const handleDeleteAll = async () => {
         if (!window.confirm("WARNING: This will delete the task for ALL users permanently. Are you sure?")) return;
         try {
@@ -209,7 +212,8 @@ const TaskMonitoring = () => {
                                                         <div><div className="text-sm font-semibold">{task.assigned_to_name}</div><div className="text-xs text-gray-500">{task.assigned_to_dept}</div></div>
                                                     </div>
                                                 </td>
-                                                <td className="p-4 text-sm text-gray-600">{new Date(task.end_date).toLocaleDateString()}</td>
+                                                {/* FIX: Use helper function */}
+                                                <td className="p-4 text-sm text-gray-600">{formatDate(task.end_date)}</td>
                                                 <td className="p-4">{getStatusBadge(task.status, computedStatus)}</td>
                                                 <td className="p-4 text-right flex justify-end gap-2">
                                                     <button onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setIsEditing(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition"><Edit size={16}/></button>
@@ -255,7 +259,7 @@ const TaskMonitoring = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">Deadline</label>
-                                            {/* FIX: Check if date exists before calling toISOString */}
+                                            {/* FIX: Check if date exists before calling toISOString to avoid crash */}
                                             <input 
                                                 type="datetime-local" 
                                                 className="w-full p-2 border rounded mt-1" 
@@ -272,8 +276,9 @@ const TaskMonitoring = () => {
                                     <>
                                         <div className="text-gray-700 bg-gray-50 p-4 rounded-lg border">{selectedTask.description}</div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-3 bg-blue-50 rounded-lg"><h3 className="text-xs font-bold text-blue-500">Assigned</h3><p className="text-blue-900 font-medium">{new Date(selectedTask.assigned_at).toLocaleString()}</p></div>
-                                            <div className="p-3 bg-red-50 rounded-lg"><h3 className="text-xs font-bold text-red-500">Deadline</h3><p className="text-red-900 font-medium">{new Date(selectedTask.end_date).toLocaleString()}</p></div>
+                                            {/* FIX: Use helper function */}
+                                            <div className="p-3 bg-blue-50 rounded-lg"><h3 className="text-xs font-bold text-blue-500">Assigned</h3><p className="text-blue-900 font-medium">{formatDate(selectedTask.assigned_at)}</p></div>
+                                            <div className="p-3 bg-red-50 rounded-lg"><h3 className="text-xs font-bold text-red-500">Deadline</h3><p className="text-red-900 font-medium">{formatDate(selectedTask.end_date)}</p></div>
                                         </div>
                                         
                                         {/* Attachments */}
@@ -282,7 +287,14 @@ const TaskMonitoring = () => {
                                             {attachments.length === 0 ? <p className="text-sm text-gray-400 italic">No files.</p> : (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     {attachments.map(file => (
-                                                        <a key={file.id} href={file.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-white border rounded hover:border-blue-400 transition group">
+                                                        <a 
+                                                            key={file.id} 
+                                                            // FIX: Direct Cloudinary URL
+                                                            href={file.file_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="flex items-center justify-between p-3 bg-white border rounded hover:border-blue-400 transition group"
+                                                        >
                                                             <div className="flex items-center gap-2 overflow-hidden">
                                                                 <FileText size={18} className="text-blue-500 flex-shrink-0"/>
                                                                 <span className="text-sm truncate">{file.file_url.split(/[\\/]/).pop()}</span>
