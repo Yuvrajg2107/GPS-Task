@@ -184,7 +184,7 @@ exports.getTaskAttachments = async (req, res) => {
     }
 };
 
-// 6. GET ADMIN STATS
+// 6. GET ADMIN STATS (UPGRADED FOR VISUALIZATIONS)
 exports.getAdminStats = async (req, res) => {
     try {
         const [userRows] = await db.query("SELECT COUNT(*) as count FROM Users WHERE role != 'admin'");
@@ -196,10 +196,49 @@ exports.getAdminStats = async (req, res) => {
             WHERE t.end_date < NOW() AND ta.status != 'completed'
         `);
 
+        // 1. Fetch tasks nearing deadline (Next 48 Hours)
+        const [nearDeadlineTasks] = await db.query(`
+            SELECT t.id, t.heading, t.category, t.end_date, u.name as assigned_to_name
+            FROM TaskAssignments ta
+            JOIN Tasks t ON ta.task_id = t.id
+            JOIN Users u ON ta.user_id = u.id
+            WHERE t.end_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 48 HOUR)
+            AND ta.status != 'completed'
+            ORDER BY t.end_date ASC
+        `);
+
+        // 2. Fetch Category-wise Stats
+        const [categoryStats] = await db.query(`
+            SELECT 
+                t.category, 
+                SUM(CASE WHEN ta.status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN ta.status != 'completed' THEN 1 ELSE 0 END) as incomplete
+            FROM Tasks t
+            JOIN TaskAssignments ta ON t.id = ta.task_id
+            WHERE t.category IS NOT NULL
+            GROUP BY t.category
+        `);
+
+        // 3. Fetch Sub-task (Heading) Stats
+        const [subtaskStats] = await db.query(`
+            SELECT 
+                t.category, 
+                t.heading as subtask,
+                SUM(CASE WHEN ta.status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN ta.status != 'completed' THEN 1 ELSE 0 END) as incomplete
+            FROM Tasks t
+            JOIN TaskAssignments ta ON t.id = ta.task_id
+            WHERE t.category IS NOT NULL
+            GROUP BY t.category, t.heading
+        `);
+
         res.json({
             total_users: userRows[0].count,
             active_tasks: activeRows[0].count,
-            overdue_tasks: overdueRows[0].count
+            overdue_tasks: overdueRows[0].count,
+            near_deadline: nearDeadlineTasks,
+            category_stats: categoryStats,
+            subtask_stats: subtaskStats
         });
 
     } catch (err) {

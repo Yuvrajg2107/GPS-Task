@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
 import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye, Trash2, Edit, X, Save, Paperclip, FileText, Download, Users } from 'lucide-react';
@@ -18,7 +19,8 @@ const TASK_CATEGORIES = {
 
 const TaskMonitoring = () => {
     const [tasks, setTasks] = useState([]);
-    const [filter, setFilter] = useState('all');
+    const location = useLocation();
+    const [filter, setFilter] = useState(location.state?.defaultFilter || 'all');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     
