@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Create an Axios instance with your backend URL
 const API = axios.create({
-    baseURL: 'https://localhost:5000/api',
+    baseURL: 'https://gps-task-backend.onrender.com/api',
 });
 
 // Interceptor: Automatically adds the "Authorization" header to every request
