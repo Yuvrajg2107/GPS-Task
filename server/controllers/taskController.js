@@ -248,17 +248,20 @@ exports.deleteTask = async (req, res) => {
     }
 };
 
-// 8. UPDATE TASK DETAILS
+// 8. UPDATE TASK DETAILS (Admin Only)
 exports.updateTaskDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const { heading, description, end_date } = req.body;
+        // ADDED: Extract 'category' from req.body
+        const { category, heading, description, end_date } = req.body;
 
+        // Format date for MySQL
         const formattedDate = new Date(end_date).toISOString().slice(0, 19).replace('T', ' ');
 
+        // ADDED: Update the 'category' column in the database
         await db.query(
-            'UPDATE Tasks SET heading=?, description=?, end_date=? WHERE id=?',
-            [heading, description, formattedDate, id]
+            'UPDATE Tasks SET category=?, heading=?, description=?, end_date=? WHERE id=?',
+            [category, heading, description, formattedDate, id]
         );
 
         res.json({ message: "Task Updated Successfully" });

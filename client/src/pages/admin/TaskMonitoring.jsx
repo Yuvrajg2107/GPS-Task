@@ -3,6 +3,19 @@ import Layout from '../../components/Layout';
 import API from '../../utils/api';
 import { Bell, CheckCircle, Clock, AlertTriangle, Filter, Search, Calendar, User, Eye, Trash2, Edit, X, Save, Paperclip, FileText, Download, Users } from 'lucide-react';
 
+// Data Dictionary for Categories and Tasks (Shared logic)
+const TASK_CATEGORIES = {
+    'MSBTE': [
+        'Affiliation', 'Student Enrollment', 'Exam Form Filling', 'Result', 'Competition', 'Miscellaneous'
+    ],
+    'DTE': [
+        'Admission', 'Audit', 'Scholarship', 'Staff Transfer', 'Miscellaneous'
+    ],
+    'Institute': [
+        'Hostel', 'AICTE EOA', 'AISHE', 'Unit Test', 'Exam Center', 'CET Cell', 'Infrastructure', 'Sports', 'Gymkhana', 'Account', 'Finance', 'Miscellaneous'
+    ]
+};
+
 const TaskMonitoring = () => {
     const [tasks, setTasks] = useState([]);
     const [filter, setFilter] = useState('all');
@@ -12,7 +25,9 @@ const TaskMonitoring = () => {
     const [selectedTask, setSelectedTask] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [attachments, setAttachments] = useState([]);
-    const [editFormData, setEditFormData] = useState({ heading: '', description: '', end_date: '' });
+    
+    // Added category to the state
+    const [editFormData, setEditFormData] = useState({ category: '', heading: '', description: '', end_date: '' });
 
     // Delete Choice Modal State
     const [deleteModal, setDeleteModal] = useState(null); 
@@ -29,6 +44,7 @@ const TaskMonitoring = () => {
                 .catch(err => console.error(err));
             
             setEditFormData({
+                category: selectedTask.category || '', // Pre-fill category
                 heading: selectedTask.heading,
                 description: selectedTask.description,
                 end_date: selectedTask.end_date
@@ -47,7 +63,6 @@ const TaskMonitoring = () => {
         }
     };
 
-    // --- FIX: Safe Date Formatter ---
     const formatDate = (dateString) => {
         if (!dateString) return "N/A";
         const date = new Date(dateString);
@@ -55,7 +70,6 @@ const TaskMonitoring = () => {
         return date.toLocaleDateString();
     };
 
-    // --- DELETE LOGIC ---
     const openDeletePrompt = (task, e) => {
         e.stopPropagation();
         setDeleteModal({
@@ -87,6 +101,15 @@ const TaskMonitoring = () => {
         } catch (err) {
             alert("Failed to delete task");
         }
+    };
+
+    // Handle changing category in edit mode
+    const handleCategoryChange = (e) => {
+        setEditFormData({ 
+            ...editFormData, 
+            category: e.target.value, 
+            heading: '' // Reset task heading when category changes
+        });
     };
 
     const handleUpdate = async (e) => {
@@ -125,7 +148,8 @@ const TaskMonitoring = () => {
 
     const filteredTasks = tasks.filter(task => {
         const computedStatus = getTaskStatus(task);
-        const matchesSearch = task.heading.toLowerCase().includes(searchTerm.toLowerCase());
+        const searchTarget = `${task.heading} ${task.category}`.toLowerCase();
+        const matchesSearch = searchTarget.includes(searchTerm.toLowerCase());
         
         if (!matchesSearch) return false;
         if (filter === 'all') return true;
@@ -158,7 +182,7 @@ const TaskMonitoring = () => {
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                         <input 
-                            type="text" placeholder="Search tasks..." 
+                            type="text" placeholder="Search tasks & categories..." 
                             className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -192,6 +216,7 @@ const TaskMonitoring = () => {
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-gray-700 border-b">
                                     <tr>
+                                        <th className="p-4 font-semibold">Category</th>
                                         <th className="p-4 font-semibold">Task Heading</th>
                                         <th className="p-4 font-semibold">Assigned To</th>
                                         <th className="p-4 font-semibold">Due Date</th>
@@ -204,6 +229,11 @@ const TaskMonitoring = () => {
                                         const computedStatus = getTaskStatus(task);
                                         return (
                                             <tr key={`${task.id}-${task.assigned_to_id}`} className="border-b hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedTask(task); setIsEditing(false); }}>
+                                                <td className="p-4">
+                                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold border">
+                                                        {task.category || 'N/A'}
+                                                    </span>
+                                                </td>
                                                 <td className="p-4 font-medium text-gray-800">{task.heading}</td>
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-2">
@@ -211,7 +241,6 @@ const TaskMonitoring = () => {
                                                         <div><div className="text-sm font-semibold">{task.assigned_to_name}</div><div className="text-xs text-gray-500">{task.assigned_to_dept}</div></div>
                                                     </div>
                                                 </td>
-                                                {/* FIX: Use helper function */}
                                                 <td className="p-4 text-sm text-gray-600">{formatDate(task.end_date)}</td>
                                                 <td className="p-4">{getStatusBadge(task.status, computedStatus)}</td>
                                                 <td className="p-4 text-right flex justify-end gap-2">
@@ -230,7 +259,7 @@ const TaskMonitoring = () => {
                     )}
                 </div>
 
-                {/* === TASK EDIT MODAL === */}
+                {/* === TASK VIEW/EDIT MODAL === */}
                 {selectedTask && (
                     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
@@ -240,7 +269,14 @@ const TaskMonitoring = () => {
                                     <h2 className="text-2xl font-bold text-gray-800">
                                         {isEditing ? "Modify Task" : selectedTask.heading}
                                     </h2>
-                                    {!isEditing && <p className="text-sm text-gray-500 mt-1">Assigned to: <b>{selectedTask.assigned_to_name}</b></p>}
+                                    {!isEditing && (
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="px-2 py-0.5 bg-white border rounded text-xs font-bold text-gray-600">
+                                                {selectedTask.category}
+                                            </span>
+                                            <span className="text-sm text-gray-500">Assigned to: <b>{selectedTask.assigned_to_name}</b></span>
+                                        </div>
+                                    )}
                                 </div>
                                 <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition"><X size={20} /></button>
                             </div>
@@ -248,20 +284,52 @@ const TaskMonitoring = () => {
                             <div className="p-6 space-y-6">
                                 {isEditing ? (
                                     <form id="editForm" onSubmit={handleUpdate} className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Heading</label>
-                                            <input type="text" className="w-full p-2 border rounded mt-1" value={editFormData.heading} onChange={e => setEditFormData({...editFormData, heading: e.target.value})} required />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Category Dropdown */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">Category</label>
+                                                <select 
+                                                    className="w-full p-2 border rounded mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    value={editFormData.category}
+                                                    onChange={handleCategoryChange}
+                                                    required
+                                                >
+                                                    <option value="" disabled>Select Category</option>
+                                                    {Object.keys(TASK_CATEGORIES).map(cat => (
+                                                        <option key={cat} value={cat}>{cat}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Heading Dropdown */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">Heading</label>
+                                                <select 
+                                                    className="w-full p-2 border rounded mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    value={editFormData.heading}
+                                                    onChange={(e) => setEditFormData({...editFormData, heading: e.target.value})}
+                                                    required
+                                                    disabled={!editFormData.category}
+                                                >
+                                                    <option value="" disabled>
+                                                        {editFormData.category ? 'Select Task' : 'Select Category First'}
+                                                    </option>
+                                                    {editFormData.category && TASK_CATEGORIES[editFormData.category].map(task => (
+                                                        <option key={task} value={task}>{task}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
+
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">Description</label>
-                                            <textarea className="w-full p-2 border rounded mt-1" rows="4" value={editFormData.description} onChange={e => setEditFormData({...editFormData, description: e.target.value})} required />
+                                            <textarea className="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 outline-none" rows="4" value={editFormData.description} onChange={e => setEditFormData({...editFormData, description: e.target.value})} />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">Deadline</label>
-                                            {/* FIX: Check if date exists before calling toISOString to avoid crash */}
                                             <input 
                                                 type="datetime-local" 
-                                                className="w-full p-2 border rounded mt-1" 
+                                                className="w-full p-2 border rounded mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
                                                 value={editFormData.end_date ? new Date(editFormData.end_date).toISOString().slice(0, 16) : ''} 
                                                 onChange={e => setEditFormData({...editFormData, end_date: e.target.value})} 
                                                 required 
@@ -273,9 +341,10 @@ const TaskMonitoring = () => {
                                     </form>
                                 ) : (
                                     <>
-                                        <div className="text-gray-700 bg-gray-50 p-4 rounded-lg border">{selectedTask.description}</div>
+                                        <div className="text-gray-700 bg-gray-50 p-4 rounded-lg border">
+                                            {selectedTask.description || <span className="text-gray-400 italic">No description provided.</span>}
+                                        </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            {/* FIX: Use helper function */}
                                             <div className="p-3 bg-blue-50 rounded-lg"><h3 className="text-xs font-bold text-blue-500">Assigned</h3><p className="text-blue-900 font-medium">{formatDate(selectedTask.assigned_at)}</p></div>
                                             <div className="p-3 bg-red-50 rounded-lg"><h3 className="text-xs font-bold text-red-500">Deadline</h3><p className="text-red-900 font-medium">{formatDate(selectedTask.end_date)}</p></div>
                                         </div>
@@ -288,7 +357,6 @@ const TaskMonitoring = () => {
                                                     {attachments.map(file => (
                                                         <a 
                                                             key={file.id} 
-                                                            // FIX: Direct Cloudinary URL
                                                             href={file.file_url} 
                                                             target="_blank" 
                                                             rel="noopener noreferrer" 
@@ -308,14 +376,14 @@ const TaskMonitoring = () => {
                                 )}
                             </div>
 
-                            <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+                            <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3 mt-auto">
                                 {isEditing ? (
                                     <>
-                                        <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded">Cancel</button>
-                                        <button type="submit" form="editForm" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"><Save size={16}/> Save Changes</button>
+                                        <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded font-medium transition">Cancel</button>
+                                        <button type="submit" form="editForm" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 font-medium transition shadow-sm"><Save size={16}/> Save Changes</button>
                                     </>
                                 ) : (
-                                    <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"><Edit size={16}/> Modify Task</button>
+                                    <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 font-medium transition shadow-sm"><Edit size={16}/> Modify Task</button>
                                 )}
                             </div>
                         </div>
@@ -359,7 +427,7 @@ const TaskMonitoring = () => {
                                 </button>
                             </div>
 
-                            <button onClick={() => setDeleteModal(null)} className="w-full mt-4 py-2 text-gray-500 hover:text-gray-800">Cancel</button>
+                            <button onClick={() => setDeleteModal(null)} className="w-full mt-4 py-2 text-gray-500 hover:text-gray-800 font-medium">Cancel</button>
                         </div>
                     </div>
                 )}

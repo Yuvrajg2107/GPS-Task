@@ -48,7 +48,7 @@ const MyTasks = () => {
         }
     };
 
-    // --- FIX: Safe Date Formatter to prevent crashes ---
+    // --- Safe Date Formatter to prevent crashes ---
     const formatDate = (dateString) => {
         if (!dateString) return "N/A";
         const date = new Date(dateString);
@@ -111,7 +111,7 @@ const MyTasks = () => {
                                     onClick={() => setSelectedTask(task)}
                                     className={`
                                         group bg-white p-6 rounded-2xl border transition-all duration-300 cursor-pointer relative overflow-hidden
-                                        hover:shadow-lg hover:-translate-y-1
+                                        hover:shadow-lg hover:-translate-y-1 flex flex-col h-full
                                         ${near ? 'border-red-300 ring-1 ring-red-100' : 'border-gray-100'}
                                     `}
                                 >
@@ -122,7 +122,7 @@ const MyTasks = () => {
                                         </div>
                                     )}
 
-                                    {/* Card Header */}
+                                    {/* Card Header (Status) */}
                                     <div className="flex justify-between items-start mb-4">
                                         <div className={`p-2 rounded-lg ${getStatusColor(task.status)} bg-opacity-50`}>
                                             {task.status === 'completed' ? <CheckCircle2 size={20}/> : <Clock size={20}/>}
@@ -132,25 +132,33 @@ const MyTasks = () => {
                                         </span>
                                     </div>
 
-                                    {/* Content */}
-                                    <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                                        {task.heading}
-                                    </h3>
-                                    
-                                    {/* Date & Info */}
-                                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded-lg">
-                                        <Calendar size={14} className="text-blue-500" />
-                                        <span className={near ? 'text-red-600 font-medium' : ''}>
-                                            {/* FIX: Use helper function */}
-                                            {formatDate(task.end_date)}
+                                    {/* NEW: Category Badge */}
+                                    <div className="mb-2">
+                                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold border">
+                                            {task.category || 'Uncategorized'}
                                         </span>
                                     </div>
 
-                                    {/* Footer */}
-                                    <div className="flex items-center justify-between text-xs text-gray-400 mt-auto pt-4 border-t border-gray-50">
-                                        <span>From: <span className="font-medium text-gray-600">{task.assigned_by_name}</span></span>
-                                        <div className="flex items-center gap-1 text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                                            View Details <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">→</div>
+                                    {/* Content */}
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                        {task.heading}
+                                    </h3>
+                                    
+                                    {/* Date & Info - Push to bottom */}
+                                    <div className="mt-auto">
+                                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded-lg">
+                                            <Calendar size={14} className="text-blue-500" />
+                                            <span className={near ? 'text-red-600 font-medium' : ''}>
+                                                {formatDate(task.end_date)}
+                                            </span>
+                                        </div>
+
+                                        {/* Footer */}
+                                        <div className="flex items-center justify-between text-xs text-gray-400 pt-4 border-t border-gray-50">
+                                            <span>From: <span className="font-medium text-gray-600">{task.assigned_by_name}</span></span>
+                                            <div className="flex items-center gap-1 text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                View Details <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">→</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -170,11 +178,17 @@ const MyTasks = () => {
                             <div className="p-6 border-b flex justify-between items-start bg-gray-50/80 sticky top-0 z-10 backdrop-blur-md rounded-t-2xl">
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-800 leading-tight">{selectedTask.heading}</h2>
-                                    <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                                        <span className="bg-white border px-2 py-0.5 rounded text-xs">Assigned by: <b>{selectedTask.assigned_by_name}</b></span>
-                                        <span>•</span>
-                                        {/* FIX: Use helper function */}
-                                        <span>{formatDate(selectedTask.assigned_at)}</span>
+                                    <div className="flex flex-wrap items-center gap-2 mt-3 text-sm text-gray-500">
+                                        {/* NEW: Category in Modal Header */}
+                                        <span className="bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
+                                            {selectedTask.category || 'Uncategorized'}
+                                        </span>
+                                        <span className="hidden sm:inline">•</span>
+                                        <span className="bg-white border px-2 py-0.5 rounded text-xs">
+                                            Assigned by: <b>{selectedTask.assigned_by_name}</b>
+                                        </span>
+                                        <span className="hidden sm:inline">•</span>
+                                        <span className="text-xs">{formatDate(selectedTask.assigned_at)}</span>
                                     </div>
                                 </div>
                                 <button 
@@ -190,7 +204,7 @@ const MyTasks = () => {
                                 {/* Description */}
                                 <div>
                                     <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Task Description</h3>
-                                    <div className="text-gray-700 leading-relaxed bg-gray-50 p-5 rounded-xl border border-gray-100">
+                                    <div className="text-gray-700 leading-relaxed bg-gray-50 p-5 rounded-xl border border-gray-100 whitespace-pre-wrap">
                                         {selectedTask.description || <span className="italic text-gray-400">No description provided.</span>}
                                     </div>
                                 </div>
@@ -226,7 +240,6 @@ const MyTasks = () => {
                                             {attachments.map(file => (
                                                 <a 
                                                     key={file.id} 
-                                                    // FIX: FORCE HTTPS to prevent "Failed to load" errors
                                                     href={file.file_url?.replace(/^http:/, "https:")} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
