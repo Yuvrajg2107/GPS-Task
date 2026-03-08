@@ -1,46 +1,35 @@
 const db = require('../db');
 const { createClient } = require('@supabase/supabase-js');
+const sendEmail = require('../utils/emailSender'); // IMPORT EMAIL UTILITY
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Initialize Supabase for Deletion operations
+// Initialize Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// 1. CREATE TASK (Admin Only)
+// 1. CREATE TASK (Admin Only) - NOW WITH EMAIL NOTIFICATION
 exports.createTask = async (req, res) => {
     const connection = await db.getConnection(); 
     try {
         await connection.beginTransaction();
 
-        console.log("📥 Received Task Data:", req.body);
-
-        // ADDED 'category' here
         const { category, heading, description, end_date, assigned_to } = req.body;
         const assigned_by = req.user.id;
         const files = req.files || []; 
 
-        if (!category || !heading || !assigned_to) {
-            throw new Error("Missing Category, Heading, or Assigned Users");
-        }
+        if (!category || !heading || !assigned_to) throw new Error("Missing Category, Heading, or Assigned Users");
 
         let assignedUserIds;
-        try {
-            assignedUserIds = JSON.parse(assigned_to);
-        } catch (e) {
-            throw new Error("Invalid assigned_to format. Expected JSON array.");
-        }
+        try { assignedUserIds = JSON.parse(assigned_to); } 
+        catch (e) { throw new Error("Invalid assigned_to format."); }
 
-        if (assignedUserIds.length === 0) {
-            throw new Error("No users selected for assignment.");
-        }
+        if (assignedUserIds.length === 0) throw new Error("No users selected.");
 
-        // --- DATE FIXES ---
         const formattedEndDate = new Date(end_date).toISOString().slice(0, 19).replace('T', ' ');
-        const now = new Date();
-        const formattedStartDate = now.toISOString().slice(0, 19).replace('T', ' ');
+        const formattedStartDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-        // Step 1: Insert Task Details (ADDED 'category' to SQL query)
+        // Step 1: Insert Task Details
         const [taskResult] = await connection.query(
             'INSERT INTO Tasks (heading, category, description, assigned_by, end_date) VALUES (?, ?, ?, ?, ?)',
             [heading, category, description, assigned_by, formattedEndDate]
@@ -49,10 +38,7 @@ exports.createTask = async (req, res) => {
 
         // Step 2: Assign to Users
         const assignmentValues = assignedUserIds.map(userId => [
-            taskId, 
-            userId, 
-            'viewed', 
-            formattedStartDate 
+            taskId, userId, 'viewed', formattedStartDate 
         ]);
 
         await connection.query(
@@ -71,6 +57,52 @@ exports.createTask = async (req, res) => {
 
         await connection.commit();
         res.status(201).json({ message: "Task Assigned Successfully!" });
+
+        // ==========================================
+        // 📧 SEND EMAIL TO ALL ASSIGNED USERS (ASYNC)
+        // ==========================================
+        try {
+            // Fetch the emails and names of the assigned users
+            const placeholders = assignedUserIds.map(() => '?').join(',');
+            const [users] = await db.query(
+                `SELECT name, email FROM Users WHERE id IN (${placeholders}) AND email IS NOT NULL`, 
+                assignedUserIds
+            );
+
+            // Format dates for the email
+            const emailDueDate = new Date(end_date).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            // Send an email to each user
+            for (let user of users) {
+                if (user.email) {
+                    const subject = `🔔 New Task Assigned: ${heading}`;
+                    const htmlContent = `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+                            <div style="background-color: #2563EB; padding: 20px; text-align: center;">
+                                <h2 style="color: white; margin: 0;">New Task Assigned</h2>
+                            </div>
+                            <div style="padding: 20px; background-color: #ffffff;">
+                                <p style="font-size: 16px; color: #374151;">Hello <b>${user.name}</b>,</p>
+                                <p style="font-size: 16px; color: #374151;">A new task has been assigned to you by the Principal/Admin.</p>
+                                
+                                <div style="background-color: #F3F4F6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                    <p style="margin: 0 0 10px 0;"><b>📁 Category:</b> ${category}</p>
+                                    <p style="margin: 0 0 10px 0;"><b>📌 Task:</b> ${heading}</p>
+                                    <p style="margin: 0 0 10px 0;"><b>📝 Description:</b> ${description || 'No additional details provided.'}</p>
+                                    <p style="margin: 0; color: #DC2626;"><b>⏰ Due Date:</b> ${emailDueDate}</p>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #6B7280;">Please log in to your GPS Task Manager dashboard to view any attachments and update your progress.</p>
+                            </div>
+                        </div>
+                    `;
+                    // Send email in the background
+                    sendEmail(user.email, subject, htmlContent);
+                }
+            }
+        } catch (emailErr) {
+            console.error("Error triggering assignment emails:", emailErr);
+        }
 
     } catch (err) {
         await connection.rollback();
@@ -319,6 +351,56 @@ exports.deleteTaskAssignment = async (req, res) => {
         );
         res.json({ message: "Task removed for this user" });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 10. Send Reminder
+exports.sendReminder = async (req, res) => {
+    try {
+        const { user_id, task_heading, task_category } = req.body; 
+
+        // 1. Fetch the user's email
+        const [users] = await db.query('SELECT name, email FROM Users WHERE id = ?', [user_id]);
+        
+        if (users.length === 0 || !users[0].email) {
+            return res.status(400).json({ error: "User does not have an email address configured." });
+        }
+
+        const user = users[0];
+
+        // 2. Format the Email Content
+        const subject = `⚠️ URGENT REMINDER: Task Overdue / Due Soon`;
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+                <div style="background-color: #EA580C; padding: 20px; text-align: center;">
+                    <h2 style="color: white; margin: 0;">Action Required: Task Reminder</h2>
+                </div>
+                <div style="padding: 20px; background-color: #ffffff;">
+                    <p style="font-size: 16px; color: #374151;">Hello <b>${user.name}</b>,</p>
+                    <p style="font-size: 16px; color: #374151;">This is a reminder from the Principal regarding an incomplete task assigned to you.</p>
+                    
+                    <div style="background-color: #FFF7ED; border-left: 4px solid #EA580C; padding: 15px; margin: 20px 0;">
+                        <p style="margin: 0 0 5px 0;"><b>Category:</b> ${task_category || 'N/A'}</p>
+                        <p style="margin: 0;"><b>Task:</b> ${task_heading}</p>
+                    </div>
+                    
+                    <p style="font-size: 14px; color: #DC2626; font-weight: bold;">Please log in to the dashboard immediately to complete this task and update its status.</p>
+                </div>
+            </div>
+        `;
+
+        // 3. Send the Email
+        const emailSent = await sendEmail(user.email, subject, htmlContent);
+
+        if (emailSent) {
+            res.json({ message: "Reminder email sent successfully!" });
+        } else {
+            res.status(500).json({ error: "Failed to send email. Check server logs." });
+        }
+
+    } catch (err) {
+        console.error("Reminder Error:", err); 
         res.status(500).json({ error: err.message });
     }
 };

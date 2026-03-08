@@ -1,6 +1,5 @@
 const db = require('../db');
 const jwt = require('jsonwebtoken');
-// const bcrypt = require('bcryptjs'); // REMOVED for clear text requirement
 
 // 1. LOGIN LOGIC
 exports.login = async (req, res) => {
@@ -14,19 +13,18 @@ exports.login = async (req, res) => {
         const user = users[0];
 
         // Check password (PLAIN TEXT COMPARISON)
-        // previously: await bcrypt.compare(password, user.password_hash);
         if (password !== user.password) {
             return res.status(400).json({ error: "Invalid Password" });
         }
 
-        // Create Token
+        // Create Token (Included email in token just in case)
         const token = jwt.sign(
-            { id: user.id, role: user.role, name: user.name, department: user.department },
+            { id: user.id, role: user.role, name: user.name, department: user.department, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
-        res.json({ message: "Login Successful", token, user: { id: user.id, name: user.name, role: user.role, department: user.department } });
+        res.json({ message: "Login Successful", token, user: { id: user.id, name: user.name, role: user.role, department: user.department, email: user.email } });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -36,16 +34,16 @@ exports.login = async (req, res) => {
 // 2. CREATE USER LOGIC (Admin Only)
 exports.registerUser = async (req, res) => {
     try {
-        const { name, phone_number, password, role, department, gender } = req.body;
+        const { name, phone_number, email, password, role, department, gender } = req.body;
 
         // Check if phone number already exists
         const [existing] = await db.query('SELECT * FROM Users WHERE phone_number = ?', [phone_number]);
         if (existing.length > 0) return res.status(400).json({ error: "Phone number already exists" });
 
-        // Insert into DB (PLAIN TEXT PASSWORD)
+        // Insert into DB
         await db.query(
-            'INSERT INTO Users (name, phone_number, password, role, department, gender) VALUES (?, ?, ?, ?, ?, ?)',
-            [name, phone_number, password, role, department, gender]
+            'INSERT INTO Users (name, phone_number, email, password, role, department, gender) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [name, phone_number, email, password, role, department, gender]
         );
 
         res.status(201).json({ message: "User created successfully" });
@@ -55,13 +53,13 @@ exports.registerUser = async (req, res) => {
     }
 };
 
-// 3. GET ALL USERS (Modified to return Phone & Password)
+// 3. GET ALL USERS
 exports.getUsers = async (req, res) => {
     try {
         const { role, department } = req.query; 
         
-        // Select all necessary fields including password and phone_number
-        let query = "SELECT id, name, phone_number, password, role, department, gender FROM Users WHERE role != 'admin'";
+        // ADDED 'email' to the SELECT query
+        let query = "SELECT id, name, phone_number, email, password, role, department, gender FROM Users WHERE role != 'admin'";
         let params = [];
 
         if (role) {
@@ -73,7 +71,7 @@ exports.getUsers = async (req, res) => {
             params.push(department);
         }
 
-        query += " ORDER BY id DESC"; // Show newest users first
+        query += " ORDER BY id DESC";
 
         const [results] = await db.query(query, params);
         res.json(results);
@@ -83,15 +81,16 @@ exports.getUsers = async (req, res) => {
     }
 };
 
-// 4. UPDATE USER (New)
+// 4. UPDATE USER
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, phone_number, password, role, department, gender } = req.body;
+        const { name, phone_number, email, password, role, department, gender } = req.body;
 
+        // ADDED 'email' to the UPDATE query
         await db.query(
-            'UPDATE Users SET name=?, phone_number=?, password=?, role=?, department=?, gender=? WHERE id=?',
-            [name, phone_number, password, role, department, gender, id]
+            'UPDATE Users SET name=?, phone_number=?, email=?, password=?, role=?, department=?, gender=? WHERE id=?',
+            [name, phone_number, email, password, role, department, gender, id]
         );
 
         res.json({ message: "User Updated Successfully" });
@@ -100,7 +99,7 @@ exports.updateUser = async (req, res) => {
     }
 };
 
-// 5. DELETE USER (New)
+// 5. DELETE USER
 exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import API from '../../utils/api';
 import { Trash2, UserPlus, Edit, Download, Search, Filter } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Import Excel Library
+import * as XLSX from 'xlsx';
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
@@ -16,7 +16,7 @@ const UserManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', phone_number: '', password: '', role: 'faculty', department: 'CM', gender: 'Male'
+        name: '', phone_number: '', email: '', password: '', role: 'faculty', department: 'CM', gender: 'Male'
     });
 
     useEffect(() => { fetchUsers(); }, []);
@@ -33,19 +33,17 @@ const UserManagement = () => {
         e.preventDefault();
         try {
             if (isEditing) {
-                // Update Logic
                 await API.put(`/auth/${editId}`, formData);
                 alert("User Updated Successfully!");
                 setIsEditing(false);
                 setEditId(null);
             } else {
-                // Create Logic
                 await API.post('/auth/register', formData);
                 alert("User Added Successfully!");
             }
             
             fetchUsers(); // Refresh
-            setFormData({ name: '', phone_number: '', password: '', role: 'faculty', department: 'CM', gender: 'Male' });
+            setFormData({ name: '', phone_number: '', email: '', password: '', role: 'faculty', department: 'CM', gender: 'Male' });
         } catch (err) {
             alert(err.response?.data?.error || "Operation Failed");
         }
@@ -55,14 +53,14 @@ const UserManagement = () => {
         setFormData({
             name: user.name,
             phone_number: user.phone_number,
-            password: user.password, // Showing plain text password
+            email: user.email || '', // Populate Email
+            password: user.password,
             role: user.role,
             department: user.department,
             gender: user.gender
         });
         setEditId(user.id);
         setIsEditing(true);
-        // Scroll to form
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -77,7 +75,8 @@ const UserManagement = () => {
     // Filter Logic
     const filteredUsers = users.filter(user => {
         return (
-            user.name.toLowerCase().includes(search.toLowerCase()) &&
+            (user.name.toLowerCase().includes(search.toLowerCase()) || 
+             (user.email && user.email.toLowerCase().includes(search.toLowerCase()))) &&
             (roleFilter === '' || user.role === roleFilter) &&
             (deptFilter === '' || user.department === deptFilter)
         );
@@ -94,7 +93,7 @@ const UserManagement = () => {
     const cancelEdit = () => {
         setIsEditing(false);
         setEditId(null);
-        setFormData({ name: '', phone_number: '', password: '', role: 'faculty', department: 'CM', gender: 'Male' });
+        setFormData({ name: '', phone_number: '', email: '', password: '', role: 'faculty', department: 'CM', gender: 'Male' });
     };
 
     return (
@@ -117,12 +116,16 @@ const UserManagement = () => {
                         {isEditing ? "Edit User" : "Add New User"}
                     </h2>
                     
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Changed grid layout to md:grid-cols-4 to fit the new email field nicely */}
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <input type="text" placeholder="Full Name" required className="p-2 border rounded"
                             value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                         
                         <input type="text" placeholder="Phone Number" required className="p-2 border rounded"
                             value={formData.phone_number} onChange={e => setFormData({...formData, phone_number: e.target.value})} />
+                        
+                        <input type="email" placeholder="Email Address" required className="p-2 border rounded"
+                            value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                         
                         <input type="text" placeholder="Password (Clear Text)" required className="p-2 border rounded"
                             value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
@@ -141,7 +144,7 @@ const UserManagement = () => {
                             <option value="Male">Male</option><option value="Female">Female</option>
                         </select>
 
-                        <div className="md:col-span-3 flex gap-3">
+                        <div className="md:col-span-4 flex gap-3 mt-2">
                             <button type="submit" className={`flex-1 text-white py-2 rounded font-semibold transition ${isEditing ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                                 {isEditing ? "Update User" : "Create User"}
                             </button>
@@ -159,7 +162,7 @@ const UserManagement = () => {
                     <div className="flex-1 relative">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                         <input 
-                            type="text" placeholder="Search by name..." className="w-full pl-10 p-2 border rounded outline-none"
+                            type="text" placeholder="Search by name or email..." className="w-full pl-10 p-2 border rounded outline-none"
                             value={search} onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
@@ -181,11 +184,12 @@ const UserManagement = () => {
 
                 {/* User List Table */}
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
-                    <table className="w-full text-left min-w-[800px]">
+                    <table className="w-full text-left min-w-[900px]">
                         <thead className="bg-gray-50 text-gray-700">
                             <tr>
                                 <th className="p-4">Name</th>
                                 <th className="p-4">Phone</th>
+                                <th className="p-4">Email</th>
                                 <th className="p-4">Password</th>
                                 <th className="p-4">Role</th>
                                 <th className="p-4">Department</th>
@@ -197,6 +201,7 @@ const UserManagement = () => {
                                 <tr key={user.id} className="border-t hover:bg-gray-50">
                                     <td className="p-4 font-medium">{user.name}</td>
                                     <td className="p-4 text-gray-600">{user.phone_number}</td>
+                                    <td className="p-4 text-gray-600 text-sm">{user.email || 'N/A'}</td>
                                     <td className="p-4 text-gray-500 font-mono text-sm bg-gray-50 rounded px-2">{user.password}</td>
                                     <td className="p-4 capitalize">
                                         <span className={`px-2 py-1 rounded text-xs font-semibold ${user.role === 'faculty' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'}`}>

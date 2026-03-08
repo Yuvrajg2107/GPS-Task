@@ -127,13 +127,18 @@ const TaskMonitoring = () => {
         }
     };
 
-    const sendReminder = async (userId, taskHeading, e) => {
+    const sendReminder = async (userId, taskHeading, taskCategory, e) => {
         e.stopPropagation();
         try {
-            await API.post('/tasks/remind', { user_id: userId, task_heading: taskHeading });
-            alert("Reminder Notification Sent!");
+            // Include task_category in the request
+            await API.post('/tasks/remind', { 
+                user_id: userId, 
+                task_heading: taskHeading,
+                task_category: taskCategory
+            });
+            alert("Reminder Email Sent Successfully!");
         } catch (err) {
-            alert("Failed to send reminder");
+            alert(err.response?.data?.error || "Failed to send reminder");
         }
     };
 
@@ -249,7 +254,7 @@ const TaskMonitoring = () => {
                                                     <button onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setIsEditing(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition"><Edit size={16}/></button>
                                                     <button onClick={(e) => openDeletePrompt(task, e)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition"><Trash2 size={16}/></button>
                                                     {task.status !== 'completed' && (
-                                                        <button onClick={(e) => sendReminder(task.assigned_to_id, task.heading, e)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition" title="Send Reminder"><Bell size={16}/></button>
+                                                        <button onClick={(e) => sendReminder(task.assigned_to_id, task.heading, task.category, e)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition" title="Send Reminder"><Bell size={16}/></button>
                                                     )}
                                                 </td>
                                             </tr>

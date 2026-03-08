@@ -16,7 +16,7 @@ router.post('/create',
     uploadToSupabase,      // Step 2: Uploads to Supabase & gets public URL
     notificationController.createNotification // Step 3: Saves notification DB
 );
-
+router.post('/remind', verifyToken, taskController.sendReminder);
 // History (Admin Only)
 router.get('/all', verifyToken, checkRole(['admin']), notificationController.getAllNotifications);
 
