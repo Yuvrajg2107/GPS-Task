@@ -107,39 +107,39 @@ exports.getMyNotifications = async (req, res) => {
 };
 
 // 4. Send Reminder
-exports.sendReminder = async (req, res) => {
-    const connection = await db.getConnection();
-    try {
-        await connection.beginTransaction();
+// exports.sendReminder = async (req, res) => {
+//     const connection = await db.getConnection();
+//     try {
+//         await connection.beginTransaction();
 
-        const { user_id, task_heading } = req.body; 
-        const sender_id = req.user.id; 
+//         const { user_id, task_heading } = req.body; 
+//         const sender_id = req.user.id; 
 
-        const title = "Task Reminder";
-        const message = `Reminder: Your task "${task_heading}" is pending or nearing its deadline. Please update the status.`;
+//         const title = "Task Reminder";
+//         const message = `Reminder: Your task "${task_heading}" is pending or nearing its deadline. Please update the status.`;
 
-        const [result] = await connection.query(
-            'INSERT INTO Notifications (title, message, sender_id) VALUES (?, ?, ?)',
-            [title, message, sender_id]
-        );
-        const notificationId = result.insertId;
+//         const [result] = await connection.query(
+//             'INSERT INTO Notifications (title, message, sender_id) VALUES (?, ?, ?)',
+//             [title, message, sender_id]
+//         );
+//         const notificationId = result.insertId;
 
-        await connection.query(
-            'INSERT INTO NotificationRecipients (notification_id, user_id) VALUES (?, ?)',
-            [notificationId, user_id]
-        );
+//         await connection.query(
+//             'INSERT INTO NotificationRecipients (notification_id, user_id) VALUES (?, ?)',
+//             [notificationId, user_id]
+//         );
 
-        await connection.commit();
-        res.json({ message: "Reminder sent successfully!" });
+//         await connection.commit();
+//         res.json({ message: "Reminder sent successfully!" });
 
-    } catch (err) {
-        await connection.rollback();
-        console.error("Reminder Error:", err); 
-        res.status(500).json({ error: err.message });
-    } finally {
-        connection.release();
-    }
-};
+//     } catch (err) {
+//         await connection.rollback();
+//         console.error("Reminder Error:", err); 
+//         res.status(500).json({ error: err.message });
+//     } finally {
+//         connection.release();
+//     }
+// };
 
 // 5. DELETE NOTIFICATION (Updated to Delete Files from Supabase)
 exports.deleteNotification = async (req, res) => {

@@ -30,7 +30,7 @@ router.put('/:taskId/status', verifyToken, taskController.updateTaskStatus);
 router.put('/:id', verifyToken, checkRole(['admin']), taskController.updateTaskDetails);
 
 // Reminder
-router.post('/remind', verifyToken, checkRole(['admin']), notificationController.sendReminder);
+router.post('/remind', verifyToken, taskController.sendReminder);
 
 // Attachments
 router.get('/:taskId/attachments', verifyToken, taskController.getTaskAttachments);

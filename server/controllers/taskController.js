@@ -356,51 +356,83 @@ exports.deleteTaskAssignment = async (req, res) => {
 };
 
 // 10. Send Reminder
+// ==========================================
+// SEND REMINDER (COMBINED: App DB Notification + Email)
+// ==========================================
 exports.sendReminder = async (req, res) => {
+    const connection = await db.getConnection();
     try {
-        const { user_id, task_heading, task_category } = req.body; 
+        await connection.beginTransaction();
 
-        // 1. Fetch the user's email
+        const { user_id, task_heading, task_category } = req.body; 
+        const sender_id = req.user.id; 
+
+        // ----------------------------------------------------
+        // PART 1: Save App Notification to Database
+        // ----------------------------------------------------
+        const title = "Task Reminder";
+        const message = `Reminder: Your task "${task_heading}" is pending or nearing its deadline. Please update the status.`;
+
+        const [result] = await connection.query(
+            'INSERT INTO Notifications (title, message, sender_id) VALUES (?, ?, ?)',
+            [title, message, sender_id]
+        );
+        const notificationId = result.insertId;
+
+        await connection.query(
+            'INSERT INTO NotificationRecipients (notification_id, user_id) VALUES (?, ?)',
+            [notificationId, user_id]
+        );
+
+        // Commit the DB transaction immediately so the user gets the in-app notification
+        await connection.commit();
+
+        // ----------------------------------------------------
+        // PART 2: Send the Email Notification
+        // ----------------------------------------------------
+        // Fetch the user's email & name
         const [users] = await db.query('SELECT name, email FROM Users WHERE id = ?', [user_id]);
         
-        if (users.length === 0 || !users[0].email) {
-            return res.status(400).json({ error: "User does not have an email address configured." });
+        let emailSent = false;
+
+        if (users.length > 0 && users[0].email) {
+            const user = users[0];
+            const subject = `⚠️ URGENT REMINDER: Task Overdue / Due Soon`;
+            const htmlContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+                    <div style="background-color: #EA580C; padding: 20px; text-align: center;">
+                        <h2 style="color: white; margin: 0;">Action Required: Task Reminder</h2>
+                    </div>
+                    <div style="padding: 20px; background-color: #ffffff;">
+                        <p style="font-size: 16px; color: #374151;">Hello <b>${user.name}</b>,</p>
+                        <p style="font-size: 16px; color: #374151;">This is a reminder from the Principal regarding an incomplete task assigned to you.</p>
+                        
+                        <div style="background-color: #FFF7ED; border-left: 4px solid #EA580C; padding: 15px; margin: 20px 0;">
+                            <p style="margin: 0 0 5px 0;"><b>Category:</b> ${task_category || 'N/A'}</p>
+                            <p style="margin: 0;"><b>Task:</b> ${task_heading}</p>
+                        </div>
+                        
+                        <p style="font-size: 14px; color: #DC2626; font-weight: bold;">Please log in to the dashboard immediately to complete this task and update its status.</p>
+                    </div>
+                </div>
+            `;
+
+            // Send Email
+            emailSent = await sendEmail(user.email, subject, htmlContent);
         }
 
-        const user = users[0];
-
-        // 2. Format the Email Content
-        const subject = `⚠️ URGENT REMINDER: Task Overdue / Due Soon`;
-        const htmlContent = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
-                <div style="background-color: #EA580C; padding: 20px; text-align: center;">
-                    <h2 style="color: white; margin: 0;">Action Required: Task Reminder</h2>
-                </div>
-                <div style="padding: 20px; background-color: #ffffff;">
-                    <p style="font-size: 16px; color: #374151;">Hello <b>${user.name}</b>,</p>
-                    <p style="font-size: 16px; color: #374151;">This is a reminder from the Principal regarding an incomplete task assigned to you.</p>
-                    
-                    <div style="background-color: #FFF7ED; border-left: 4px solid #EA580C; padding: 15px; margin: 20px 0;">
-                        <p style="margin: 0 0 5px 0;"><b>Category:</b> ${task_category || 'N/A'}</p>
-                        <p style="margin: 0;"><b>Task:</b> ${task_heading}</p>
-                    </div>
-                    
-                    <p style="font-size: 14px; color: #DC2626; font-weight: bold;">Please log in to the dashboard immediately to complete this task and update its status.</p>
-                </div>
-            </div>
-        `;
-
-        // 3. Send the Email
-        const emailSent = await sendEmail(user.email, subject, htmlContent);
-
+        // Return a smart response depending on if they had an email or not
         if (emailSent) {
-            res.json({ message: "Reminder email sent successfully!" });
+            res.json({ message: "App Notification AND Email sent successfully!" });
         } else {
-            res.status(500).json({ error: "Failed to send email. Check server logs." });
+            res.json({ message: "App Notification sent! (No email configured for this user)" });
         }
 
     } catch (err) {
+        await connection.rollback();
         console.error("Reminder Error:", err); 
         res.status(500).json({ error: err.message });
+    } finally {
+        connection.release();
     }
 };
