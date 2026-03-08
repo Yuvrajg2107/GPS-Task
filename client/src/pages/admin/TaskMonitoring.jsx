@@ -8,8 +8,7 @@ const TaskMonitoring = () => {
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
-
-    // Edit Modal State
+    
     const [selectedTask, setSelectedTask] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [attachments, setAttachments] = useState([]);
