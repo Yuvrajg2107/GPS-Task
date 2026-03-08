@@ -3,6 +3,39 @@ import Layout from '../../components/Layout';
 import API from '../../utils/api';
 import { Search, Paperclip, X, FileText, Check, User } from 'lucide-react';
 
+// Data Dictionary for Categories and Tasks
+const TASK_CATEGORIES = {
+    'MSBTE': [
+        'Affiliation', 
+        'Student Enrollment', 
+        'Exam Form Filling', 
+        'Result', 
+        'Competition', 
+        'Miscellaneous'
+    ],
+    'DTE': [
+        'Admission', 
+        'Audit', 
+        'Scholarship', 
+        'Staff Transfer', 
+        'Miscellaneous'
+    ],
+    'Institute': [
+        'Hostel', 
+        'AICTE EOA', 
+        'AISHE', 
+        'Unit Test', 
+        'Exam Center', 
+        'CET Cell', 
+        'Infrastructure', 
+        'Sports', 
+        'Gymkhana', 
+        'Account', 
+        'Finance', 
+        'Miscellaneous'
+    ]
+};
+
 const AdminTasks = () => {
     const [step, setStep] = useState(1);
     const [users, setUsers] = useState([]);
@@ -15,6 +48,7 @@ const AdminTasks = () => {
 
     // Task Data
     const [taskData, setTaskData] = useState({
+        category: '', // NEW
         heading: '',
         description: '',
         end_date: '',
@@ -54,11 +88,23 @@ const AdminTasks = () => {
         });
     };
 
+    // Reset heading if category changes
+    const handleCategoryChange = (e) => {
+        setTaskData({ 
+            ...taskData, 
+            category: e.target.value, 
+            heading: '' // Reset task heading when category changes
+        });
+    };
+
     const handleSubmit = async () => {
-        if (!taskData.heading || !taskData.end_date) return alert("Please fill required fields");
+        if (!taskData.category || !taskData.heading || !taskData.end_date) {
+            return alert("Please fill Category, Task Heading, and Due Date");
+        }
         if (selectedUsers.length === 0) return alert("Please select at least one user");
 
         const formData = new FormData();
+        formData.append('category', taskData.category); // NEW
         formData.append('heading', taskData.heading);
         formData.append('description', taskData.description);
         formData.append('end_date', taskData.end_date);
@@ -69,14 +115,12 @@ const AdminTasks = () => {
         });
 
         try {
-            // FIX: REMOVED manual 'Content-Type' header. 
-            // Axios/Browser creates the correct boundary automatically when it sees FormData.
             await API.post('/tasks/create', formData);
             
             alert("Task Assigned Successfully!");
             setStep(1);
             setSelectedUsers([]);
-            setTaskData({ heading: '', description: '', end_date: '', files: [] });
+            setTaskData({ category: '', heading: '', description: '', end_date: '', files: [] });
         } catch (err) {
             alert("Failed to assign task. Please try again.");
             console.error(err);
@@ -109,7 +153,7 @@ const AdminTasks = () => {
                 {/* STEP 1: SELECT USERS */}
                 {step === 1 && (
                     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border flex flex-col flex-1 max-h-[calc(100vh-200px)] md:max-h-[calc(100vh-220px)]">
-                        {/* Filters (Fixed at top) */}
+                        {/* Filters */}
                         <div className="flex-none flex flex-col md:flex-row gap-4 mb-4">
                             <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
@@ -136,9 +180,9 @@ const AdminTasks = () => {
                             </div>
                         </div>
 
-                        {/* User List Area (Scrollable) */}
+                        {/* User List */}
                         <div className="flex-1 overflow-y-auto rounded-lg border border-gray-100 min-h-0">
-                            {/* Desktop View: Table */}
+                            {/* Desktop View */}
                             <table className="hidden md:table w-full text-left">
                                 <thead className="bg-gray-50 sticky top-0 z-10">
                                     <tr>
@@ -167,7 +211,7 @@ const AdminTasks = () => {
                                 </tbody>
                             </table>
 
-                            {/* Mobile View: Cards */}
+                            {/* Mobile View */}
                             <div className="md:hidden space-y-2 p-2 bg-gray-50">
                                 {filteredUsers.map(user => (
                                     <div 
@@ -192,7 +236,6 @@ const AdminTasks = () => {
                             </div>
                         </div>
                         
-                        {/* Footer (Fixed at bottom) */}
                         <div className="flex-none mt-4 pt-4 border-t flex justify-between items-center bg-white">
                             <span className="text-gray-600 font-medium text-sm md:text-base">{selectedUsers.length} selected</span>
                             <button 
@@ -209,32 +252,55 @@ const AdminTasks = () => {
                 {step === 2 && (
                     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border flex flex-col flex-1 overflow-y-auto">
                         <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Heading</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                    value={taskData.heading}
-                                    onChange={(e) => setTaskData({...taskData, heading: e.target.value})}
-                                    placeholder="Enter task title"
-                                />
+                            
+                            {/* NEW: Category and Heading Dropdowns */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Task Category <span className="text-red-500">*</span></label>
+                                    <select 
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        value={taskData.category}
+                                        onChange={handleCategoryChange}
+                                    >
+                                        <option value="" disabled>Select Category</option>
+                                        {Object.keys(TASK_CATEGORIES).map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Task Heading <span className="text-red-500">*</span></label>
+                                    <select 
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        value={taskData.heading}
+                                        onChange={(e) => setTaskData({...taskData, heading: e.target.value})}
+                                        disabled={!taskData.category} // Disabled until category is selected
+                                    >
+                                        <option value="" disabled>
+                                            {taskData.category ? 'Select Task' : 'Select Category First'}
+                                        </option>
+                                        {taskData.category && TASK_CATEGORIES[taskData.category].map(task => (
+                                            <option key={task} value={task}>{task}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
                                 <textarea 
-                                    rows="4" 
+                                    rows="3" 
                                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
                                     value={taskData.description}
                                     onChange={(e) => setTaskData({...taskData, description: e.target.value})}
-                                    placeholder="Enter task details..."
+                                    placeholder="Enter additional details..."
                                 />
                             </div>
 
-                            {/* Stack inputs on mobile, grid on desktop */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date <span className="text-red-500">*</span></label>
                                     <input 
                                         type="datetime-local" 
                                         className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-white"
@@ -244,7 +310,7 @@ const AdminTasks = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Attachments</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Attachments (Optional)</label>
                                     <div className="relative border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center hover:bg-gray-50 transition cursor-pointer bg-gray-50 md:bg-white">
                                         <input 
                                             type="file" 
@@ -258,7 +324,6 @@ const AdminTasks = () => {
 
                                     {taskData.files.length > 0 && (
                                         <div className="mt-3 space-y-2">
-                                            <p className="text-xs font-semibold text-gray-500">Selected Files:</p>
                                             {taskData.files.map((file, index) => (
                                                 <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-md border text-sm">
                                                     <div className="flex items-center gap-2 truncate overflow-hidden">

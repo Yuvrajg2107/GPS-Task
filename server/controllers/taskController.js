@@ -15,12 +15,13 @@ exports.createTask = async (req, res) => {
 
         console.log("📥 Received Task Data:", req.body);
 
-        const { heading, description, end_date, assigned_to } = req.body;
+        // ADDED 'category' here
+        const { category, heading, description, end_date, assigned_to } = req.body;
         const assigned_by = req.user.id;
         const files = req.files || []; 
 
-        if (!heading || !assigned_to) {
-            throw new Error("Missing Heading or Assigned Users");
+        if (!category || !heading || !assigned_to) {
+            throw new Error("Missing Category, Heading, or Assigned Users");
         }
 
         let assignedUserIds;
@@ -39,10 +40,10 @@ exports.createTask = async (req, res) => {
         const now = new Date();
         const formattedStartDate = now.toISOString().slice(0, 19).replace('T', ' ');
 
-        // Step 1: Insert Task Details
+        // Step 1: Insert Task Details (ADDED 'category' to SQL query)
         const [taskResult] = await connection.query(
-            'INSERT INTO Tasks (heading, description, assigned_by, end_date) VALUES (?, ?, ?, ?)',
-            [heading, description, assigned_by, formattedEndDate]
+            'INSERT INTO Tasks (heading, category, description, assigned_by, end_date) VALUES (?, ?, ?, ?, ?)',
+            [heading, category, description, assigned_by, formattedEndDate]
         );
         const taskId = taskResult.insertId;
 
@@ -87,8 +88,9 @@ exports.getTasks = async (req, res) => {
         const userRole = req.user.role;
         const { status } = req.query;
 
+        // ADDED 't.category' to the SELECT statement
         let query = `
-            SELECT t.id, t.heading, t.description, t.end_date, 
+            SELECT t.id, t.heading, t.category, t.description, t.end_date, 
                    ta.status, ta.assigned_at, ta.user_id as assigned_to_id, 
                    u1.name as assigned_by_name, 
                    u2.name as assigned_to_name, u2.department as assigned_to_dept
