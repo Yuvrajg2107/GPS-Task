@@ -1,20 +1,24 @@
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
+const dns = require('dns'); // Built-in Node.js module
+
+// 1. FORCE IPv4: This single line fixes the ENETUNREACH IPv6 error
+dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config();
 
-// Updated Transporter to bypass IPv6 issues
+// 2. USE PORT 587: More universally unblocked than 465
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true for 465, false for other ports
+    port: 587, 
+    secure: false, // MUST be false when using port 587
+    requireTLS: true, // Upgrades the connection to secure automatically
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        // Do not fail on invalid certs (helps in some hosting environments)
-        rejectUnauthorized: false 
+        rejectUnauthorized: false // Prevents local certificate errors
     }
 });
 
