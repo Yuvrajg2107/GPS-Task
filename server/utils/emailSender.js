@@ -1,42 +1,38 @@
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 const dotenv = require('dotenv');
-const dns = require('dns'); // Built-in Node.js module
-
-// 1. FORCE IPv4: This single line fixes the ENETUNREACH IPv6 error
-dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config();
 
-// 2. USE PORT 587: More universally unblocked than 465
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587, 
-    secure: false, // MUST be false when using port 587
-    requireTLS: true, // Upgrades the connection to secure automatically
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false // Prevents local certificate errors
-    }
-});
-
-// Function to send an email
+// Function to send an email using Brevo REST API (Bypasses Render's SMTP Block)
 const sendEmail = async (to, subject, htmlContent) => {
     try {
-        const mailOptions = {
-            from: `"GPS Task Manager" <${process.env.EMAIL_USER}>`,
-            to: to,
-            subject: subject,
-            html: htmlContent
-        };
+        const response = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            {
+                sender: {
+                    name: "GPS Task Manager",
+                    email: process.env.SENDER_EMAIL // The email you used to sign up for Brevo
+                },
+                to: [
+                    { email: to }
+                ],
+                subject: subject,
+                htmlContent: htmlContent
+            },
+            {
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': process.env.BREVO_API_KEY,
+                    'content-type': 'application/json'
+                }
+            }
+        );
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log(`✉️ Email sent successfully to ${to} (${info.messageId})`);
+        console.log(`✉️ Email sent successfully to ${to} via Brevo API`);
         return true;
     } catch (error) {
-        console.error("❌ Email Sending Failed:", error.message);
+        // Log detailed error from Brevo if it fails dscvqwdvvwvvw
+        console.error("❌ Email Sending Failed:", error.response ? error.response.data : error.message);
         return false; 
     }
 };
